@@ -1,8 +1,9 @@
 // The theatre CineStack starts with. Everything here is data a manager will edit from the admin
 // panel (a later milestone); nothing else in the app knows how many auditoriums there are.
 //
-// Modelled on Garrett 8 Cinemas' public details. Seat counts, layouts and equipment are not
-// published, so those are placeholders, and so are the film titles until the film lookup exists.
+// A made-up eight-screen theatre in a made-up town, so the demo reads like a real cinema without
+// being anyone's. Seat counts, layouts and equipment are placeholders, and so are the film titles
+// until the film lookup exists.
 
 /**
  * A seat layout as a grid: rows of cells, where a cell is a seat or a gap (an aisle).
@@ -26,12 +27,12 @@ export function grid({ rows, seats, aisles = [], wheelchair = [], companion = []
 }
 
 export const theatre = {
-  id: 'garrett8',
-  name: 'Garrett 8 Cinemas',
-  town: 'Deep Creek Lake, Maryland',
-  address: '19741 Garrett Highway, Deep Creek Lake, MD 21550',
+  id: 'hemlock-ridge',
+  name: 'Hemlock Ridge Cinema 8',
+  town: 'Hemlock Ridge, Maryland',
+  address: '1 Marquee Lane, Hemlock Ridge, Maryland',
   timeZone: 'America/New_York',
-  concept: 'Concept for Garrett 8 Cinemas by Potomac Solutions. Not the theatre’s website; nothing here is really for sale.',
+  concept: 'Concept by Potomac Solutions. Hemlock Ridge Cinema 8 is a made-up theatre; nothing here is really for sale.',
 };
 
 export const auditoriums = [
@@ -47,7 +48,7 @@ export const auditoriums = [
 
 /**
  * What one seat costs, in cents, until price rules arrive (adult, child, matinee, discount day,
- * 3D). A placeholder: Garrett 8's own prices replace it in the prices milestone.
+ * 3D). A placeholder until the prices milestone.
  */
 export const SEAT_CENTS = 1100;
 
