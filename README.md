@@ -2,7 +2,7 @@
 
 A movie theatre on one small Node server: showtimes, seats, tickets and the door, and (next) snacks and the manager's admin panel. Built with [Zubra](https://github.com/journey-to-code-org/zubra).
 
-The first theatre configured in it is a concept for Garrett 8 Cinemas. It is not the theatre's website, and nothing in it is really for sale.
+The theatre configured in it, Hemlock Ridge Cinema 8, is made up. Nothing in it is really for sale.
 
 ## What works today
 
