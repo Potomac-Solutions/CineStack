@@ -1,6 +1,6 @@
 # CineStack
 
-A movie theatre on one small Node server: showtimes, seats, tickets and the door, and (next) snacks and the manager's admin panel. Built with [Zubra](https://github.com/journey-to-code-org/zubra).
+A movie theatre on one small Node server: showtimes, seats, tickets and the door, and (next) snacks and the manager's admin panel. Built with [Zubra](https://github.com/zubra-js/zubra).
 
 The theatre configured in it, Hemlock Ridge Cinema 8, is made up. Nothing in it is really for sale.
 
