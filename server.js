@@ -51,12 +51,15 @@ const time = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric',
 export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'cinestack.db'), cache = true, secret = process.env.SESSION_SECRET, holdMs, sweepMs, staffCost, now = Date.now } = {}) {
   if (!secret) {
     if (process.env.NODE_ENV === 'production') throw new Error('Set SESSION_SECRET.');
-    secret = 'cinestack-development-only';
+    // The kit signs nothing with a secret under 32 characters.
+    secret = 'cinestack-development-only-not-a-secret';
   }
   const boxOffice = createBoxOffice({ db, holdMs, sweepMs });
   const session = sessions({ secret });
   // The theatre's people, in its own log; sign-in, links, people and passwords are the kit's pages.
   const production = process.env.NODE_ENV === 'production';
+  // How many proxies in front add to X-Forwarded-For (one on Railway).
+  const proxies = Number(process.env.TRUST_PROXIES ?? 0);
   const staff = createStaff({ store: boxOffice.store, secure: production, ...(staffCost ? { cost: staffCost } : {}) });
   const onShift = (from) => staff.can(staff.session(from), 'staff');
   // Guests who make an account (kit/customers), in the theatre's own log. A guest is their
@@ -71,14 +74,15 @@ export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'cines
       tickets: ({ name, film, when, hall, seats, total, link }) => ({ subject: `Your tickets: ${film}`, body: `Hi ${name},\n\n${film}, ${when}, ${hall}. Seats ${seats}. ${total}, paid (test mode).\n\nShow the code at the door: ${link}` }),
     },
   });
-  const proxies = Number(process.env.TRUST_PROXIES ?? 0);
   const origin = (req) => process.env.PUBLIC_URL || `http://${req.headers.host ?? 'localhost'}`;
   const admin = createAdmin({ boxOffice, customers, sent: mail.sent, now });
   const zubra = createZubra({ components, cache, packages: ['@potomac-solutions/kit/components'] });
   const qr = await loadQr();
   const actions = await createActions({
     components,
-    context: ({ request }) => ({ boxOffice, guest: withAccount(session.fromRequest(request), request), staff: onShift(request) }),
+    // `client`: the guest's address, so one address holds only so many seats however many guests
+    // it is (a script with no cookie is a new guest every time). `req` is there on Node only.
+    context: ({ request, req }) => ({ boxOffice, guest: withAccount(session.fromRequest(request), request), staff: onShift(request), client: req ? clientAddress(req, { proxies }) : '' }),
   });
   boxOffice.identify((request) => withAccount(session.fromRequest(request), request));
   const served = files();
@@ -153,7 +157,7 @@ ${p.render('door-scanner', { resultNow: result ?? {}, timeZone: boxOffice.theatr
   const page = (res, p, title, body, options = {}) => send(res, options.status ?? 200, p.finish(layout({ title, theatre: boxOffice.theatre, body, actionsScript: actions.script(), ...options })));
   // The staff's side (the door, the admin, and the kit's people and password pages) has its own frame.
   const staffPage = (res, p, title, body, who, { status = 200, ...options } = {}) => send(res, status, p.finish(shell({ title, theatre: boxOffice.theatre, body: cards(body), who, owner: staff.can(who, 'owner'), actionsScript: actions.script(), ...options })));
-  const pages = staffPages({ staff, notices, proxies: Number(process.env.TRUST_PROXIES ?? 0), home: '/staff/door', business: boxOffice.theatre.name, secure: production, render: (res, title, body) => (staff.can(res.who, 'staff') ? staffPage(res, zubra.page(), title, body, res.who, { here: title === 'People' ? '/staff/people' : '' }) : page(res, zubra.page(), title, `<div class="auth">${body}</div>`)) });
+  const pages = staffPages({ staff, notices, proxies, home: '/staff/door', business: boxOffice.theatre.name, secure: production, render: (res, title, body) => (staff.can(res.who, 'staff') ? staffPage(res, zubra.page(), title, body, res.who, { here: title === 'People' ? '/staff/people' : '' }) : page(res, zubra.page(), title, `<div class="auth">${body}</div>`)) });
 
   function home(p, guest, account) {
     const mine = boxOffice
