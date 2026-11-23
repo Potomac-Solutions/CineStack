@@ -227,3 +227,23 @@ kbd { padding: 0.05rem 0.4rem; border-radius: 0.3rem; background: rgb(255 255 25
 /* ...and the dark theme takes the guests' ink back. */
 :root[data-theme=dark] body.staff { --ink: #eceef3; --ink-soft: #a7aebf; --line: #333847; --note: #22262f; --primary: var(--glow); --primary-foreground: #14161b; --brand: var(--glow); --brand-deep: var(--glow-hi); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme=light]) body.staff { --ink: #eceef3; --ink-soft: #a7aebf; --line: #333847; --note: #22262f; --primary: var(--glow); --primary-foreground: #14161b; --brand: var(--glow); --brand-deep: var(--glow-hi); } }
+
+/* CineStack: column names come from the table (src/tables.js), so cells stay as written. */
+.staff table.cards td:first-child a { white-space: nowrap; }
+@media (max-width: 44rem) {
+  .staff table.cards td:first-child { font-weight: 700; font-size: 1.05rem; }
+  .staff table.cards td:first-child small { font-weight: 400; }
+  .staff table.cards td:nth-child(n+2)::before { color: var(--muted-foreground); font-size: 0.85rem; font-weight: 600; }
+  .staff table.cards td:nth-child(2)::before { content: var(--c2, ""); }
+  .staff table.cards td:nth-child(3)::before { content: var(--c3, ""); }
+  .staff table.cards td:nth-child(4)::before { content: var(--c4, ""); }
+  .staff table.cards td:nth-child(5)::before { content: var(--c5, ""); }
+  .staff table.cards td:nth-child(6)::before { content: var(--c6, ""); }
+  .staff table.cards td:nth-child(7)::before { content: var(--c7, ""); }
+  .staff table.cards td:nth-child(8)::before { content: var(--c8, ""); }
+  .staff table.cards td:nth-child(9)::before { content: var(--c9, ""); }
+}
+.staff dl > * { min-width: 0; }
+.staff dd, .staff td { overflow-wrap: anywhere; }
+.staff main > *, .staff .panel > * { min-width: 0; }
+.staff .table-wrap:has(table:not(.cards)), .staff .panel:has(> table:not(.cards)) { overflow-x: auto; }

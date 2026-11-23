@@ -20,12 +20,13 @@ const shots = args.includes('--shots') ? args[args.indexOf('--shots') + 1] : '';
 const base = (args.find((arg) => /^https?:/.test(arg)) ?? 'http://localhost:3000').replace(/\/$/, '');
 const WIDTHS = [320, 375, 768, 1280, 1920];
 
-// The guest holds two seats on the way, so the page a hold makes (pay) is checked too. The owner
-// is whoever you set up; pass OWNER=email,password.
-const [ownerEmail, ownerPassword] = (process.env.OWNER ?? 'owner@example.com,hemlock-owner-demo').split(',');
+// Against the demo (`npm run demo`). The guest holds a seat on the way, so the page a hold makes
+// (pay) is checked too.
 const ROLES = [
-  { name: 'guest', routes: ['/', '/staff/door'], book: true },
-  { name: 'owner', signIn: ['/staff/door', ownerEmail, ownerPassword], routes: ['/staff/door', '/staff/people', '/staff/password'] },
+  { name: 'guest', routes: ['/', '/account/sign-in', '/account/sign-up', '/account/forgot', '/staff/door'], book: true },
+  { name: 'customer', signIn: ['/account/sign-in', 'riley@example.com', 'hemlock-guest-demo'], routes: ['/', '/account'] },
+  { name: 'staff', signIn: ['/admin', 'door@example.com', 'hemlock-door-demo'], routes: ['/staff/door', '/admin', '/admin/reports'] },
+  { name: 'owner', signIn: ['/admin', 'manager@example.com', 'hemlock-manager-demo'], routes: ['/staff/door', '/admin', '/admin/tickets', '/admin/guests', '/admin/reports', '/admin/settings', '/admin/outbox', '/staff/people', '/staff/password'], first: ['/admin/guests'] },
 ];
 
 /** Runs in the page: structure, labels and contrast. Returns a list of problems. */
@@ -140,6 +141,12 @@ for (const scheme of ['light', 'dark']) {
       await free.nth(scheme === 'dark' ? 40 : 30).check({ force: true });
       await page.waitForFunction(() => /Seat /.test(document.querySelector('seat-chart .hold')?.innerText ?? ''), null, { timeout: 5000 }).catch(() => {});
       routes.push(show.replace('/show/', '/book/'));
+    }
+    // One guest, from the list.
+    for (const list of role.first ?? []) {
+      await page.goto(base + list);
+      const href = await page.locator(`main a[href^="${list}/"]`).first().getAttribute('href').catch(() => null);
+      if (href) routes.push(href);
     }
     for (const route of routes) {
       const where = `${role.name} ${route} (${scheme})`;
