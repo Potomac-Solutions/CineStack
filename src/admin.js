@@ -35,19 +35,14 @@ export function createAdmin({ boxOffice, customers, sent, now = Date.now }) {
   const percent = (share) => `${Math.round(share * 100)}%`;
   const soldAt = (ticket) => ticket.booked ?? ticket.at ?? ticket.starts;
 
-  function nav(here, owner) {
-    const link = (href, words) => `<a href="${href}"${here === href ? ' aria-current="page"' : ''}>${words}</a>`;
-    return `<nav class="admin-nav" aria-label="Admin"><small>Theatre</small>${link('/admin', 'Tonight')}${link('/admin/tickets', 'Tickets')}${link('/admin/guests', 'Guests')}${link('/staff/door', 'The door')}${
-      owner ? `<small>Manager</small>${link('/admin/reports', 'Reports')}${link('/admin/settings', 'Settings')}${link('/staff/people', 'Staff')}${link('/admin/outbox', 'Outbox')}` : ''
-    }</nav>`;
-  }
-  const frame = (here, owner, bar, body) => `<div class="admin">${nav(here, owner)}<div class="admin-body">${bar}${body}</div></div>`;
+  // Each page used to wrap itself in the admin's navigation; src/shell.js does that now.
+  const frame = (_here, _owner, _bar, body) => body;
   const ticketRows = (list) =>
     list.length
       ? `<div class="table-wrap"><table><thead><tr><th scope="col">Showing</th><th scope="col">Film</th><th scope="col">Seats</th><th scope="col">Guest</th><th scope="col">Status</th><th scope="col" class="num">Paid</th></tr></thead><tbody>${list
           .map((ticket) => `<tr><td>${dateTime(ticket.starts)}<br><small class="muted">${escape(ticket.hall?.name ?? '')}</small></td><td>${escape(ticket.film?.title ?? '')}</td><td>${escape((ticket.units ?? []).join(', '))}</td><td>${escape(ticket.name || 'Guest')}${ticket.customer ? ` <a class="muted" href="/admin/guests/${escape(ticket.customer)}">(account)</a>` : ''}<br><small class="muted">${escape(ticket.email ?? '')}</small></td><td><span class="badge ${ticket.status === 'scanned' ? 'past' : 'booked'}">${ticket.status === 'scanned' ? `In at ${clock(ticket.scanned)}` : 'Booked'}</span></td><td class="num">${money(ticket.cents ?? 0)}</td></tr>`)
           .join('')}</tbody></table></div>`
-      : '<p>None.</p>';
+      : '<p class="muted">Nothing here.</p>';
 
   function filterTickets(url) {
     const q = (url.searchParams.get('q') ?? '').trim().toLowerCase().slice(0, 80);
@@ -74,7 +69,7 @@ export function createAdmin({ boxOffice, customers, sent, now = Date.now }) {
         '/admin',
         owner,
         bar,
-        `<section><h1>Tonight</h1><p class="lede">${escape(boxOffice.theatre.name)}. Good to see you, ${escape(who.name.split(' ')[0])}.</p></section>
+        `<section class="page-head"><h1>Tonight</h1><p class="lede">${escape(boxOffice.theatre.name)}. Good to see you, ${escape(who.name.split(' ')[0])}.</p></section>
 <div class="tiles">
   <div class="tile"><span>Seats sold tonight</span><strong>${sold}</strong><small>${percent(capacity ? sold / capacity : 0)} of ${capacity}</small></div>
   <div class="tile"><span>Through the door</span><strong>${tonightTickets.filter((ticket) => ticket.status === 'scanned').length}</strong><small>of ${tonightTickets.length} tickets booked online</small></div>
@@ -100,9 +95,9 @@ export function createAdmin({ boxOffice, customers, sent, now = Date.now }) {
         '/admin/tickets',
         owner,
         bar,
-        `<section><h1>Tickets</h1><p class="lede">${list.length} ticket${list.length === 1 ? '' : 's'}, ${list.reduce((n, ticket) => n + seats(ticket), 0)} seats, ${money(totals(list, { amount: (ticket) => ticket.cents ?? 0 }).amount)}.</p></section>
+        `<section class="page-head"><h1>Tickets</h1><p class="lede">${list.length} ticket${list.length === 1 ? '' : 's'}, ${list.reduce((n, ticket) => n + seats(ticket), 0)} seats, ${money(totals(list, { amount: (ticket) => ticket.cents ?? 0 }).amount)}.</p></section>
 <form class="panel filters" method="get" action="/admin/tickets">
-  <label>Search<input name="q" value="${escape(url.searchParams.get('q') ?? '')}" placeholder="Name, email, seat or code"></label>
+  <label class="grow">Search<input name="q" type="search" value="${escape(url.searchParams.get('q') ?? '')}" placeholder="Name, email, seat or code"></label>
   <label>When<select name="when">${option('tonight', 'Tonight', when)}${option('past', 'Earlier', when)}${option('all', 'All', when)}</select></label>
   <label>Film<select name="film">${option('', 'Any', url.searchParams.get('film') ?? '')}${boxOffice.films().map((film) => option(film.id, film.title, url.searchParams.get('film'))).join('')}</select></label>
   <button type="submit">Show</button>
@@ -135,8 +130,8 @@ export function createAdmin({ boxOffice, customers, sent, now = Date.now }) {
         '/admin/guests',
         owner,
         bar,
-        `<section><h1>Guests</h1><p class="lede">${customers.list().length} with accounts. Anyone can also book without one.</p></section>
-<form class="panel filters" method="get" action="/admin/guests"><label>Search<input name="q" value="${escape(url.searchParams.get('q') ?? '')}" placeholder="Name or email"></label><button type="submit">Show</button><a class="button light" href="/admin/guests.csv">Download CSV</a></form>
+        `<section class="page-head"><h1>Guests</h1><p class="lede">${customers.list().length} with accounts. Anyone can also book without one.</p></section>
+<form class="panel filters" method="get" action="/admin/guests"><label class="grow">Search<input name="q" type="search" value="${escape(url.searchParams.get('q') ?? '')}" placeholder="Name or email"></label><button type="submit">Show</button><a class="button light" href="/admin/guests.csv">Download CSV</a></form>
 <section class="panel"><div class="table-wrap"><table><thead><tr><th scope="col">Guest</th><th scope="col">Joined</th><th scope="col" class="num">Visits</th><th scope="col" class="num">Spent</th></tr></thead><tbody>${list
           .slice((page - 1) * PAGE, page * PAGE)
           .map((one) => {
@@ -164,7 +159,7 @@ export function createAdmin({ boxOffice, customers, sent, now = Date.now }) {
         '/admin/guests',
         owner,
         bar,
-        `<section><a href="/admin/guests">All guests</a><h1>${escape(one.name)}</h1><p class="lede">${escape(one.email)} · joined ${dateTime(one.at)}${one.disabled ? ' · <span class="badge off">Turned off</span>' : ''}</p></section>
+        `<section class="page-head"><a class="back" href="/admin/guests">All guests</a><h1>${escape(one.name)}</h1><p class="lede">${escape(one.email)} · joined ${dateTime(one.at)}${one.disabled ? ' · <span class="badge off">Turned off</span>' : ''}</p></section>
 ${said}
 <div class="tiles"><div class="tile"><span>Visits</span><strong>${tickets.length}</strong></div><div class="tile"><span>Spent</span><strong>${money(totals(tickets, { amount: (ticket) => ticket.cents ?? 0 }).amount)}</strong></div><div class="tile"><span>Saw most</span><strong>${escape(breakdown(tickets, { key: (ticket) => ticket.film?.title ?? '' })[0]?.key ?? '—')}</strong></div></div>
 <section class="panel"><h2>Tickets</h2>${ticketRows(tickets)}</section>
@@ -204,8 +199,8 @@ ${
         '/admin/reports',
         owner,
         bar,
-        `<section><h1>Reports</h1><p class="lede">${r.label}, by ${r.by}, in the theatre’s time (${escape(zone)}). Counted on the night of each showing.</p></section>
-<div class="panel filters" role="group" aria-label="Range">${Object.entries(RANGES).map(([k, one]) => `<a class="button${k === r.key ? '' : ' light'}" href="?range=${k}"${k === r.key ? ' aria-current="true"' : ''}>${one.label}</a>`).join('')}</div>
+        `<section class="page-head"><h1>Reports</h1><p class="lede">${r.label}, by ${r.by}, in the theatre’s time (${escape(zone)}). Counted on the night of each showing.</p></section>
+<div class="segments" role="group" aria-label="Range">${Object.entries(RANGES).map(([k, one]) => `<a class="button${k === r.key ? '' : ' light'}" href="?range=${k}"${k === r.key ? ' aria-current="true"' : ''}>${one.label}</a>`).join('')}</div>
 <div class="tiles">
   <div class="tile"><span>Box office</span><strong>${money(sum.amount)}</strong></div>
   <div class="tile"><span>Tickets</span><strong>${sum.count}</strong><small>${seatCount} seats</small></div>
@@ -214,7 +209,7 @@ ${
 </div>
 <section class="panel"><h2>Box office by ${r.by}</h2>${barChart(r.buckets.map((b) => ({ label: short(b.start, r.by), value: b.amount, tip: `${short(b.start, r.by)}: ${money(b.amount)} from ${b.count} tickets` })), { name: 'Box office', format: money })}<p><a class="button light" href="/admin/reports.csv?range=${r.key}">Download CSV</a></p></section>
 <section class="two">
-  <div class="panel"><h2>By film</h2>${byFilm.length ? rankBars(byFilm.map((row) => ({ label: row.key, value: row.amount })), { format: money }) : '<p>None.</p>'}<h2>Seats by auditorium</h2>${byHall.length ? rankBars(byHall.map((row) => ({ label: row.key, value: row.amount }))) : '<p>None.</p>'}</div>
+  <div class="panel"><h2>By film</h2>${byFilm.length ? rankBars(byFilm.map((row) => ({ label: row.key, value: row.amount })), { format: money }) : '<p class="muted">Nothing here.</p>'}<h2>Seats by auditorium</h2>${byHall.length ? rankBars(byHall.map((row) => ({ label: row.key, value: row.amount }))) : '<p class="muted">Nothing here.</p>'}</div>
   <div class="panel"><h2>Seats by time of night</h2>${rankBars(bySlot)}<h2>Seats by day of the week</h2>${rankBars(weekday)}</div>
 </section>`,
       );
@@ -234,7 +229,7 @@ ${
         '/admin/settings',
         owner,
         bar,
-        `<section><h1>Settings</h1><p class="lede">The seat price applies to seats chosen from now on; tickets already bought keep theirs.</p></section>
+        `<section class="page-head"><h1>Settings</h1><p class="lede">The seat price applies to seats chosen from now on; tickets already bought keep theirs.</p></section>
 ${said}
 <form class="panel" method="post" action="/admin/settings"><h2>Seat price</h2><label>Every seat, every showing ($)<input name="price" inputmode="decimal" required value="${(boxOffice.seatPrice() / 100).toFixed(2)}"></label><button type="submit">Save</button></form>`,
       );
@@ -246,8 +241,8 @@ ${said}
         '/admin/outbox',
         owner,
         bar,
-        `<section><h1>Outbox</h1><p class="lede">This demo sends no real email. What it would have sent since the server started is here, newest first.</p></section>
-<section class="panel">${list.length ? list.map((message) => `<article class="stack" style="border-top:1px solid var(--border);padding-top:0.75rem"><p><strong>${escape(message.subject)}</strong><br><small class="muted">To ${escape(message.to)}</small></p><pre style="white-space:pre-wrap;margin:0">${escape(message.body)}</pre></article>`).join('') : '<p>Nothing sent yet.</p>'}</section>`,
+        `<section class="page-head"><h1>Outbox</h1><p class="lede">This demo sends no real email. What it would have sent since the server started is here, newest first.</p></section>
+<section class="panel">${list.length ? list.map((message) => `<article class="message"><p><strong>${escape(message.subject)}</strong><br><small class="muted">To ${escape(message.to)}</small></p><pre>${escape(message.body)}</pre></article>`).join('') : '<p>Nothing sent yet.</p>'}</section>`,
       );
     },
   };

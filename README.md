@@ -1,6 +1,6 @@
 # CineStack
 
-A movie theatre on one small Node server: showtimes, seats, tickets and the door, and (next) snacks and the manager's admin panel. Built with [Zubra](https://github.com/journey-to-code-org/zubra).
+A movie theatre on one small Node server: showtimes, seats, tickets and the door, and (next) snacks and the manager's admin panel. Built with [Zubra](https://github.com/zubra-js/zubra).
 
 The theatre configured in it, Hemlock Ridge Cinema 8, is made up. Nothing in it is really for sale.
 
@@ -50,6 +50,15 @@ Snacks, trailers, price rules and the lobby boards are the next milestones (`pla
 | `src/log.js` | The Sync log in one SQLite table, one row per field |
 | `src/seed.js` | The theatre, its auditoriums and their seat layouts, as data |
 
+## How it looks
+
+- **The landing page** (`/`) is photo-led: the auditorium, one line and one button (**Get tickets**), then tonight's films, each with a still, its rating and every showtime as a button straight to the seats. Below: choosing the exact seat, the theatre, how it works, and where it is. Its words are `site` in `src/seed.js`; `src/site.js` lays it out.
+- **Photographs** are files in `public/photos/`: `hero`, `seats`, `marquee`, and one still per film named by the film's id (`night-ferry`), as `.jpg` or `.webp`. Replace a file and restart. The ones here were generated for this made-up theatre and its made-up films; see `public/photos/README.md`.
+- **Type** is Big Shoulders Display and Manrope, self-hosted from `@fontsource`. The house is dark for guests; the colours are tokens at the top of `public/base.css`.
+- **Accounts** (sign in, sign up, a guest's tickets) take the same type and cards; the small forms sit in a narrow card.
+- **The door and the admin** share one page frame (`src/shell.js`): a sidebar at a desk; on a phone a bar on top, tabs along the bottom and the sidebar as a sheet. Light or dark follows the device, with a switch that remembers. Tables become cards on a phone (`src/tables.js`).
+- **Checks.** With the demo running (`npm run demo`), `npm run design-check` walks every page as a guest, an account holder, staff and the manager, holds a seat on the way, and checks five widths in light and dark.
+
 ## Run it
 
 ```sh
@@ -58,7 +67,7 @@ npm start        # http://localhost:3000
 npm test         # needs Chrome or Playwright's Chromium
 ```
 
-Node 22.13 or later. `SESSION_SECRET` is required in production; `DATA_DIR` says where the database file goes. Behind a proxy (Railway, Fly, a load balancer), set `TRUST_PROXIES` to how many add to `X-Forwarded-For` (usually `1`), so a wrong-password lockout falls on the device guessing and not on everyone; left unset, no header is trusted and every sign-in counts as the proxy's address.
+Node 26. `SESSION_SECRET` is required in production; `DATA_DIR` says where the database file goes. Behind a proxy (Railway, Fly, a load balancer), set `TRUST_PROXIES` to how many add to `X-Forwarded-For` (usually `1`), so a wrong-password lockout falls on the device guessing and not on everyone; left unset, no header is trusted and every sign-in counts as the proxy's address.
 
 Relative component imports work on Windows from Zubra 5.10.2 (the compiler keyed them by `/` paths only; CineStack patched it until the fix shipped).
 

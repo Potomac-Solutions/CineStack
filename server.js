@@ -25,8 +25,14 @@ import { loadQr } from '@journey-to-code/symbology';
 import { createBoxOffice } from './src/box-office.js';
 import { sessions } from './src/session.js';
 import { layout, escape } from './src/layout.js';
+import { shell } from './src/shell.js';
+import { cards } from './src/tables.js';
+import { serveAsset } from './src/assets.js';
+import { landing } from './src/site.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
+/** The staff's pages, for marking where you are in the sidebar. */
+const STAFF_LINKS = ['/staff/door', '/admin', '/admin/tickets', '/admin/guests', '/admin/reports', '/admin/settings', '/admin/outbox', '/staff/people'];
 const components = join(here, 'src', 'components');
 
 /** The door's camera script and symbology's decoder, which the door page loads. */
@@ -108,7 +114,7 @@ export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'cines
   function bookPage(p, showing, booking, problem, account) {
     const film = boxOffice.film(showing.film);
     const cart = { lines: booking.units.map((seat, i) => ({ item: seat, qty: 1, name: `Seat ${seat}`, total: booking.lines[i]?.cents ?? 0 })), cents: booking.cents, ready: booking.state === 'held' || booking.state === 'failed' };
-    return `<section>
+    return `<section class="page-head">
   <a class="back" href="/show/${showing.id}">Back to the seats</a>
   <h1>${escape(film.title)}</h1>
   <p class="lede">${time(showing.starts)} · ${escape(boxOffice.hall(showing.auditorium).name)} · held for you until ${time(booking.until)}</p>
@@ -118,7 +124,7 @@ ${p.render('checkout-form', { cart, place: `/book/${showing.id}`, checkout: book
 
   /** The door: scan a ticket's code, from a photo or typed. For a door-shift device. */
   function doorPage(p, result) {
-    return `<section>
+    return `<section class="page-head">
   <h1>Door</h1>
   <p class="lede">Scan each ticket once. A ticket that has been used says when.</p>
 </section>
@@ -145,31 +151,25 @@ ${p.render('door-scanner', { resultNow: result ?? {}, timeZone: boxOffice.theatr
 </section>`;
   }
   const page = (res, p, title, body, options = {}) => send(res, options.status ?? 200, p.finish(layout({ title, theatre: boxOffice.theatre, body, actionsScript: actions.script(), ...options })));
-  const pages = staffPages({ staff, notices, proxies: Number(process.env.TRUST_PROXIES ?? 0), home: '/staff/door', business: boxOffice.theatre.name, secure: production, render: (res, title, body) => page(res, zubra.page(), title, body) });
+  // The staff's side (the door, the admin, and the kit's people and password pages) has its own frame.
+  const staffPage = (res, p, title, body, who, { status = 200, ...options } = {}) => send(res, status, p.finish(shell({ title, theatre: boxOffice.theatre, body: cards(body), who, owner: staff.can(who, 'owner'), actionsScript: actions.script(), ...options })));
+  const pages = staffPages({ staff, notices, proxies: Number(process.env.TRUST_PROXIES ?? 0), home: '/staff/door', business: boxOffice.theatre.name, secure: production, render: (res, title, body) => (staff.can(res.who, 'staff') ? staffPage(res, zubra.page(), title, body, res.who, { here: title === 'People' ? '/staff/people' : '' }) : page(res, zubra.page(), title, `<div class="auth">${body}</div>`)) });
 
   function home(p, guest, account) {
-    const mine = boxOffice.ticketsFor(guest);
-    const tickets = mine.length
-      ? `<section class="mine"><h2>Your tickets</h2><ul>${mine
-          .map((ticket) => `<li><a href="/ticket/${ticket.key}"><strong>${escape(ticket.film.title)}</strong> ${time(ticket.showing.starts)} · ${escape(ticket.hall.name)} · ${ticket.units.length === 1 ? 'Seat' : 'Seats'} ${escape(ticket.units.join(', '))}${ticket.status === 'scanned' ? ' · used' : ''}</a></li>`)
-          .join('')}</ul></section>`
-      : '';
+    const mine = boxOffice
+      .ticketsFor(guest)
+      .map((ticket) => `<li><a href="/ticket/${ticket.key}"><strong>${escape(ticket.film.title)}</strong> ${time(ticket.showing.starts)} · ${escape(ticket.hall.name)} · ${ticket.units.length === 1 ? 'Seat' : 'Seats'} ${escape(ticket.units.join(', '))}${ticket.status === 'scanned' ? ' · used' : ''}</a></li>`)
+      .join('');
     const byFilm = new Map();
     for (const showing of boxOffice.showings()) {
       if (!byFilm.has(showing.film)) byFilm.set(showing.film, []);
       byFilm.get(showing.film).push(showing);
     }
-    const cards = [...byFilm].map(([id, list]) => {
-      const film = boxOffice.film(id);
-      const times = list
-        .sort((a, b) => a.starts - b.starts)
-        .map((showing) => `<li><a href="/show/${showing.id}">${time(showing.starts)}<small>${escape(boxOffice.hall(showing.auditorium).name)}</small></a></li>`)
-        .join('');
-      return `<li class="film">${film.label ? `<span class="tag">${escape(film.label)}</span>` : ''}<h2>${escape(film.title)}</h2><p>${escape(film.rating)} · ${film.minutes} min</p><ul class="times">${times}</ul></li>`;
-    });
-    return `<section class="hero"><h1>${escape(boxOffice.theatre.name)}</h1><p class="lede">Eight screens in ${escape(boxOffice.theatre.town)}: laser projection, Dolby Atmos and heated recliners. Choose your own seats, pay on your phone, and show the code at the door.</p><div class="actions"><a class="go" href="#tonight">See what’s on tonight</a>${account ? '<a class="button light" href="/account">Your tickets</a>' : '<a class="button light" href="/account/sign-up">Make an account</a>'}</div></section>
-${tickets}<section id="tonight"><h1>Tonight</h1><p class="lede">Pick a time to choose your seats.</p></section><ul class="films">${cards.join('')}</ul>
-<section class="two"><div class="panel"><h2>How it works</h2><ol><li>Pick a showing and tap the seats you want; they’re held for you for ${Math.round(boxOffice.holdMs / 60_000)} minutes.</li><li>Pay once; your ticket is a code on your phone.</li><li>Show it at the door. Each ticket gets in once.</li></ol></div><div class="panel"><h2>Visit</h2><dl class="facts"><dt>Where</dt><dd>${escape(boxOffice.theatre.address)}</dd><dt>Seats</dt><dd>${money(boxOffice.seatPrice())} each</dd></dl></div></section>`;
+    const films = [...byFilm].map(([id, list]) => ({
+      ...boxOffice.film(id),
+      showings: list.sort((a, b) => a.starts - b.starts).map((showing) => ({ id: showing.id, at: time(showing.starts), hall: boxOffice.hall(showing.auditorium).name })),
+    }));
+    return landing({ theatre: boxOffice.theatre, films, halls: [...new Set(boxOffice.showings().map((showing) => showing.auditorium))].map((id) => boxOffice.hall(id)), money, seatCents: boxOffice.seatPrice(), mine, account });
   }
 
   function show(p, showing, guest, problem) {
@@ -181,7 +181,7 @@ ${tickets}<section id="tonight"><h1>Tonight</h1><p class="lede">Pick a time to c
       cells: row.cells.map((cell) => (cell.gap ? cell : { ...cell, ...(taken.get(cell.id) ?? { state: 'free', by: '', until: 0 }) })),
     }));
     const held = boxOffice.held(guest, showing.id);
-    return `<section>
+    return `<section class="page-head">
   <a class="back" href="/">All showings</a>
   <h1>${escape(film.title)}</h1>
   <p class="lede">${time(showing.starts)} · ${escape(hall.name)} · ${escape(film.rating)} · ${film.minutes} min</p>
@@ -197,7 +197,12 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
       if (await actions.handle(req, res)) return;
       if (zubra.handle(req, res)) return;
       const url = new URL(req.url, 'http://localhost');
+      if (serveAsset(req, res, url)) return;
+      // A made-up theatre asks not to be listed; a real one (theatre.listed) lists its public pages only.
+      if (url.pathname === '/robots.txt') return res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' }).end(boxOffice.theatre.listed ? 'User-agent: *\nDisallow: /staff\nDisallow: /admin\nDisallow: /account\nDisallow: /book\nDisallow: /ticket\n' : 'User-agent: *\nDisallow: /\n');
+      // Pages name their icon (public/favicon.svg); a bare request for the old address gets nothing.
       if (url.pathname === '/favicon.ico') return res.writeHead(204).end();
+      res.who = staff.session(req);
       const file = served.get(url.pathname);
       if (file) {
         res.writeHead(200, { 'content-type': file[0], 'cache-control': 'public, max-age=3600' });
@@ -209,7 +214,9 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
       const atDesk = staff.can(who, 'staff');
       const owner = staff.can(who, 'owner');
       const nav = { customer: account, staff: atDesk };
-      const paint = (p, title, body, options = {}) => page(res, p, title, body, { nav, ...options });
+      // Staff pages (the admin passes `wide`) go in the staff frame; the rest in the theatre's own page.
+      const staffHere = () => STAFF_LINKS.filter((href) => url.pathname === href || url.pathname.startsWith(`${href}/`)).sort((a, b) => b.length - a.length)[0] ?? '';
+      const paint = (p, title, body, { wide = false, here, ...options } = {}) => (wide ? staffPage(res, p, title, body, who, { here: staffHere(), ...options }) : page(res, p, title, body, { nav, here, ...options }));
       if (url.pathname.startsWith('/account') || url.pathname.startsWith('/admin')) res.setHeader('cache-control', 'no-store');
 
       // A guest's account, and the admin's changes: plain form posts. Another site's post is refused.
@@ -326,7 +333,7 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
       const problem = result?.value?.error ?? (result?.error ? 'That didn’t go through. Try again.' : '');
       const p = zubra.page();
 
-      if (url.pathname === '/') return paint(p, 'Tonight', home(p, guest, account), { here: '/' });
+      if (url.pathname === '/') return paint(p, 'Tonight', home(p, guest, account), { here: '/', landing: true });
 
       // A guest's account pages.
       if (url.pathname === '/account') return account ? paint(p, 'Your account', accountPages.account({ boxOffice, customer: account, guest, said: said(url) }), { here: '/account' }) : back(res, '/account/sign-in');
@@ -340,8 +347,8 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
 
       // The admin: staff only; reports, settings and the outbox for managers.
       if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
-        if (!atDesk) return paint(p, 'Sign in', pages.signIn(url));
-        const bar = pages.bar(who);
+        if (!atDesk) return paint(p, 'Sign in', `<div class="auth">${pages.signIn(url)}</div>`);
+        const bar = '';
         const wide = { wide: true, here: '/admin' };
         if (url.pathname === '/admin') return paint(p, 'Tonight', admin.dashboard({ who, owner, bar }), wide);
         if (url.pathname === '/admin/tickets') return paint(p, 'Tickets', admin.tickets({ url, owner, bar }), wide);
@@ -351,7 +358,7 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
         const oneGuest = url.pathname.match(/^\/admin\/guests\/(c[a-z0-9]+)$/);
         const one = oneGuest && customers.get(oneGuest[1]);
         if (one) return paint(p, one.name, admin.guest({ one, owner, bar, said: said(url) }), wide);
-        if (['/admin/reports', '/admin/reports.csv', '/admin/settings', '/admin/outbox'].includes(url.pathname) && !owner) return paint(p, 'Managers only', '<section><h1>Managers only</h1><p class="lede">Ask a manager to see this page.</p><p><a href="/admin">Back to tonight</a></p></section>', { status: 403 });
+        if (['/admin/reports', '/admin/reports.csv', '/admin/settings', '/admin/outbox'].includes(url.pathname) && !owner) return paint(p, 'Managers only', '<section class="page-head"><h1>Managers only</h1><p class="lede">Reports, settings and the outbox are for managers. Ask one to show you this page.</p></section><p><a class="button light" href="/admin">Back to tonight</a></p>', { status: 403, wide: true });
         if (url.pathname === '/admin/reports') return paint(p, 'Reports', admin.reports({ url, owner, bar }), wide);
         if (url.pathname === '/admin/reports.csv') return downloadCsv(res, 'box-office.csv', admin.reportCsv(url));
         if (url.pathname === '/admin/settings') return paint(p, 'Settings', admin.settings({ owner, bar, said: said(url) }), wide);
@@ -369,8 +376,8 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
       }
       if (url.pathname === '/staff/door') {
         const who = staff.session(req);
-        if (!staff.can(who, 'staff')) return paint(p, 'Sign in', pages.signIn(url));
-        return paint(p, 'Door', pages.bar(who) + doorPage(p, result?.value ?? (result?.error ? { error: 'That didn’t go through. Try again.' } : null)));
+        if (!staff.can(who, 'staff')) return paint(p, 'Sign in', `<div class="auth">${pages.signIn(url)}</div>`);
+        return paint(p, 'Door', doorPage(p, result?.value ?? (result?.error ? { error: 'That didn’t go through. Try again.' } : null)), { wide: true });
       }
       const ticketMatch = url.pathname.match(/^\/ticket\/([\w-]+)$/);
       const ticket = ticketMatch && boxOffice.ticket(guest, ticketMatch[1]);
