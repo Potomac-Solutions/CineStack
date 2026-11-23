@@ -18,11 +18,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const db = join(process.env.DATA_DIR ?? join(here, '..'), 'cinestack.db');
 if (process.argv.includes('--fresh')) for (const file of [db, `${db}-wal`, `${db}-shm`]) if (existsSync(file)) rmSync(file);
 
-export const DEMO = {
-  owner: { email: 'manager@example.com', name: 'Iris Holloway', password: 'hemlock-manager-demo' },
-  staff: { email: 'door@example.com', name: 'Theo Barnes', password: 'hemlock-door-demo' },
-  customer: { email: 'riley@example.com', name: 'Riley Morgan', password: 'hemlock-guest-demo' },
-};
+// The demo sign-ins live in src/demo.js, so the public demo can show and protect them.
+import { DEMO } from '../src/demo.js';
+export { DEMO };
 
 let seed = 20261115;
 const random = () => {

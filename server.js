@@ -21,6 +21,7 @@ import { createNotify, outbox } from '@potomac-solutions/kit/notify';
 import * as accountPages from './src/account.js';
 import { createAdmin } from './src/admin.js';
 import { createNotices } from '@potomac-solutions/kit/notice';
+import { lockedStaff, lockedCustomers, staffSignIn, guestSignIn, nightly } from './src/demo.js';
 import { loadQr } from '@journey-to-code/symbology';
 import { createBoxOffice } from './src/box-office.js';
 import { sessions } from './src/session.js';
@@ -48,7 +49,7 @@ function files() {
 
 const time = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'cinestack.db'), cache = true, secret = process.env.SESSION_SECRET, holdMs, sweepMs, staffCost, now = Date.now } = {}) {
+export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'cinestack.db'), cache = true, secret = process.env.SESSION_SECRET, holdMs, sweepMs, staffCost, now = Date.now , demo = process.env.DEMO === '1' } = {}) {
   if (!secret) {
     if (process.env.NODE_ENV === 'production') throw new Error('Set SESSION_SECRET.');
     // The kit signs nothing with a secret under 32 characters.
@@ -60,11 +61,14 @@ export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'cines
   const production = process.env.NODE_ENV === 'production';
   // How many proxies in front add to X-Forwarded-For (one on Railway).
   const proxies = Number(process.env.TRUST_PROXIES ?? 0);
-  const staff = createStaff({ store: boxOffice.store, secure: production, ...(staffCost ? { cost: staffCost } : {}) });
+  const kitStaff = createStaff({ store: boxOffice.store, secure: production, ...(staffCost ? { cost: staffCost } : {}) });
+  const staff = demo ? lockedStaff(kitStaff) : kitStaff;
   const onShift = (from) => staff.can(staff.session(from), 'staff');
   // Guests who make an account (kit/customers), in the theatre's own log. A guest is their
   // browser's public name and, signed in, their account: tickets follow either.
-  const customers = createCustomers({ store: boxOffice.store, secure: production, now, ...(staffCost ? { cost: staffCost } : {}) });
+  // The public demo (src/demo.js) refuses changes to its sign-ins.
+  const kitCustomers = createCustomers({ store: boxOffice.store, secure: production, now, ...(staffCost ? { cost: staffCost } : {}) });
+  const customers = demo ? lockedCustomers(kitCustomers) : kitCustomers;
   const withAccount = (guest, from) => guest && { ...guest, customer: customers.session(from)?.customer };
   const mail = outbox();
   const notify = createNotify({
@@ -240,7 +244,7 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
         }
         if (url.pathname === '/account/sign-in') {
           const signed = await customers.signIn(form.get('email'), form.get('password'), { client: clientAddress(req, { proxies }) });
-          if (signed.error) return paint(p, 'Sign in', accountPages.signIn({ problem: problem(signed.error === 'locked' ? 'Too many tries. Wait 15 minutes, or reset your password.' : 'That email and password don’t match.'), email: String(form.get('email') ?? '') }), { status: 401 });
+          if (signed.error) return paint(p, 'Sign in', (demo ? `<div class="auth">${guestSignIn(escape)}</div>` : '') + accountPages.signIn({ problem: problem(signed.error === 'locked' ? 'Too many tries. Wait 15 minutes, or reset your password.' : 'That email and password don’t match.'), email: String(form.get('email') ?? '') }), { status: 401 });
           await boxOffice.claim(guest, signed.customer);
           res.appendHeader('set-cookie', signed.cookie);
           return back(res, '/account');
@@ -278,7 +282,8 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
           const one = action && customers.get(action[1]);
           if (one && action[2] === 'disabled') {
             const off = form.get('disabled') === 'yes';
-            await customers.setDisabled(one.customer, off);
+            const changed = await customers.setDisabled(one.customer, off);
+            if (changed?.error) return back(res, withProblem(`/admin/customers/${one.customer}`, changed));
             await boxOffice.audit(who, `${off ? 'turned off' : 'turned back on'} ${one.name}’s account`, one.customer);
             return back(res, withDone(`/admin/guests/${one.customer}`, off ? 'Turned off and signed out everywhere.' : 'Turned back on.'));
           }
@@ -341,7 +346,7 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
 
       // A guest's account pages.
       if (url.pathname === '/account') return account ? paint(p, 'Your account', accountPages.account({ boxOffice, customer: account, guest, said: said(url) }), { here: '/account' }) : back(res, '/account/sign-in');
-      if (url.pathname === '/account/sign-in') return account ? back(res, '/account') : paint(p, 'Sign in', accountPages.signIn({ problem: said(url) }), { here: '/account/sign-in' });
+      if (url.pathname === '/account/sign-in') return account ? back(res, '/account') : paint(p, 'Sign in', (demo ? `<div class="auth">${guestSignIn(escape)}</div>` : '') + accountPages.signIn({ problem: said(url) }), { here: '/account/sign-in' });
       if (url.pathname === '/account/sign-up') return account ? back(res, '/account') : paint(p, 'Make an account', accountPages.signUp());
       if (url.pathname === '/account/forgot') return paint(p, 'Reset your password', accountPages.forgot());
       if (url.pathname === '/account/reset') {
@@ -351,7 +356,7 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
 
       // The admin: staff only; reports, settings and the outbox for managers.
       if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
-        if (!atDesk) return paint(p, 'Sign in', `<div class="auth">${pages.signIn(url)}</div>`);
+        if (!atDesk) return paint(p, 'Sign in', `<div class="auth">${demo ? staffSignIn(escape) : ''}${pages.signIn(url)}</div>`);
         const bar = '';
         const wide = { wide: true, here: '/admin' };
         if (url.pathname === '/admin') return paint(p, 'Tonight', admin.dashboard({ who, owner, bar }), wide);
@@ -380,7 +385,7 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
       }
       if (url.pathname === '/staff/door') {
         const who = staff.session(req);
-        if (!staff.can(who, 'staff')) return paint(p, 'Sign in', `<div class="auth">${pages.signIn(url)}</div>`);
+        if (!staff.can(who, 'staff')) return paint(p, 'Sign in', `<div class="auth">${demo ? staffSignIn(escape) : ''}${pages.signIn(url)}</div>`);
         return paint(p, 'Door', doorPage(p, result?.value ?? (result?.error ? { error: 'That didn’t go through. Try again.' } : null)), { wide: true });
       }
       const ticketMatch = url.pathname.match(/^\/ticket\/([\w-]+)$/);
@@ -395,12 +400,13 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
   });
 
   server.on('close', () => boxOffice.close());
-  return Object.assign(server, { boxOffice, staff, customers, sent: mail.sent });
+  return Object.assign(server, { demo, boxOffice, staff, customers, sent: mail.sent });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT ?? 3000);
   const server = await createApp();
+  if (server.demo) nightly();
   server.listen(port, '0.0.0.0', () => console.log(`CineStack on http://localhost:${port}`));
   if (server.staff.needsOwner()) console.log(`Set up the first owner (works once, for a day): http://localhost:${port}/staff/accept?token=${await server.staff.setup()}`);
 }
