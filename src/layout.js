@@ -28,9 +28,9 @@ function listing(shop, canonical) {
  * link. `landing` is the landing page: full-width sections and its own stylesheet. `toast` is a
  * signed "done" message to float.
  */
-export function layout({ title, theatre: shop, body, here = '', landing = false, toast = '', description = site.description, canonical = '', actionsScript = '' }) {
+export function layout({ title, theatre: shop, body, nav = {}, here = '', landing = false, toast = '', description = site.description, canonical = '', actionsScript = '' }) {
   const link = (href, words, cls = '') => `<a href="${href}"${cls ? ` class="${cls}"` : ''}${here === href ? ' aria-current="page"' : ''}>${words}</a>`;
-  const links = [link('/#tonight', 'Tonight', 'wide'), link('/#how', 'How it works', 'wide'), link('/#story', 'The theatre', 'wide'), link('/#visit', 'Visit')].join('');
+  const links = [link('/#tonight', 'Tonight', 'wide'), link('/#how', 'How it works', 'wide'), link('/#story', 'The theatre', 'wide'), nav.customer ? link('/account', 'Account') : link('/account/sign-in', 'Sign in'), ...(nav.staff ? [link('/admin', 'Admin')] : [])].join('');
   const fullTitle = landing ? `${shop.name} · ${shop.town}` : `${title} · ${shop.name}`;
   return `<!doctype html>
 <html lang="en">
@@ -64,8 +64,8 @@ export function layout({ title, theatre: shop, body, here = '', landing = false,
     <div class="cols">
       <div>${wordmark(shop)}<p>${escape(site.foot.line)}</p><p>${escape(shop.town)}</p><p><a class="go" href="/#tonight">${escape(site.cta)}</a></p></div>
       <div><h2>Doors</h2><p>${escape(site.doors)}</p><p>${escape(shop.address)}</p></div>
-      <div><h2>Tickets</h2><ul><li><a href="/#tonight">Tonight’s showtimes</a></li><li><a href="/#how">How it works</a></li><li><a href="/#visit">Find us</a></li></ul></div>
-      <div><h2>Staff</h2><ul><li><a href="/staff/door">The door</a></li></ul></div>
+      <div><h2>Tickets</h2><ul><li><a href="/#tonight">Tonight’s showtimes</a></li><li><a href="/#how">How it works</a></li><li><a href="/#visit">Find us</a></li><li><a href="/account">Your account</a></li></ul></div>
+      <div><h2>Staff</h2><ul><li><a href="/admin">Staff sign in</a></li><li><a href="/staff/door">The door</a></li></ul></div>
     </div>
     <div class="fine"><p>${escape(shop.concept)}</p><p><a href="${escape(site.foot.builtHref)}">${escape(site.foot.built)}</a></p></div>
   </div></footer>

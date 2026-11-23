@@ -11,7 +11,7 @@ import { site } from './seed.js';
 const picture = (name, alt, { eager = false, cls = '' } = {}) => (photo(name) ? `<img${cls ? ` class="${cls}"` : ''} src="${photo(name)}" alt="${escape(alt)}"${eager ? ' fetchpriority="high"' : ' loading="lazy"'} decoding="async">` : '');
 
 /** `films`: tonight's films, each with `showings` ({ id, at, hall }); `mine`: this guest's tickets, as list items; `halls`: the auditoriums. */
-export function landing({ theatre, films, halls, money, seatCents, mine = '' }) {
+export function landing({ theatre, films, halls, money, seatCents, mine = '', account = null }) {
   const { hero, tonight, seats, story, steps, visit } = site;
   const tickets = (cls = 'go lg') => `<a class="${cls}" href="#tonight">${escape(site.cta)}</a>`;
 
@@ -20,9 +20,9 @@ export function landing({ theatre, films, halls, money, seatCents, mine = '' }) 
     <p class="kicker">${escape(hero.kicker)}</p>
     <h1>${escape(hero.title)} <em>${escape(hero.titleSoft)}</em></h1>
     <p class="lede">${escape(hero.lede)}</p>
-    <div class="actions">${tickets()}<a class="button ghost lg" href="#how">${escape(hero.secondary)}</a></div>
+    <div class="actions"><a class="go lg" href="#tonight">${escape(hero.cta)}</a><a class="button ghost lg" href="#how">${escape(hero.secondary)}</a></div>
   </div>
-  <div class="hero-strip"><div class="wrap"><p>${escape(site.doors)}</p><p>${films.length} films tonight · every seat ${money(seatCents)}</p></div></div>
+  <div class="hero-strip"><div class="wrap"><p>${escape(site.doors)}</p><p>${films.length} films tonight · seats ${money(seatCents)} each</p></div></div>
 </section>
 ${mine ? `<div class="wrap"><section class="mine"><h2>Your tickets</h2><ul>${mine}</ul></section></div>` : ''}
 
@@ -37,7 +37,7 @@ ${mine ? `<div class="wrap"><section class="mine"><h2>Your tickets</h2><ul>${min
 
 <section class="split"><div class="wrap">
   <div class="pic">${picture('seats', 'A row of leather recliners in a dark auditorium')}</div>
-  <div class="words"><p class="kicker">${escape(seats.kicker)}</p><h2>${escape(seats.heading)}</h2><p>${escape(seats.text)}</p><p>${tickets()}</p></div>
+  <div class="words"><p class="kicker">${escape(seats.kicker)}</p><h2>${escape(seats.heading)}</h2><p>${escape(seats.text)}</p><p>${tickets()} ${account ? '<a class="button light lg" href="/account">Your tickets</a>' : '<a class="button light lg" href="/account/sign-up">Make an account</a>'}</p></div>
 </div></section>
 
 <section class="banner" id="story">${picture('marquee', '', { cls: 'bg' })}<div class="wrap"><p class="kicker">${escape(story.kicker)}</p><h2>${escape(story.heading)}</h2>${story.paragraphs.map((text) => `<p>${escape(text)}</p>`).join('')}${tickets()}</div></section>

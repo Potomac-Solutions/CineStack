@@ -90,7 +90,7 @@ export const site = {
   trade: 'Cinema 8',
   cta: 'Get tickets',
   doors: 'Doors open 3:30 pm, every day',
-  hero: { kicker: 'Hemlock Ridge, Maryland · eight screens', title: 'Your seat is saved', titleSoft: 'before you leave the house.', lede: 'Pick a film, pick a time, pick the exact seat. Your ticket is on your phone.', secondary: 'How it works' },
+  hero: { kicker: 'Hemlock Ridge, Maryland · eight screens', title: 'Your seat is saved', titleSoft: 'before you leave the house.', lede: 'Pick a film, pick a time, pick the exact seat. Your ticket is on your phone.', cta: 'See what’s on tonight', secondary: 'How it works' },
   tonight: { kicker: 'Now showing', heading: 'Tonight', lede: 'Pick a time to choose your seats.' },
   seats: { kicker: 'No more front row', heading: 'Choose the exact seat.', text: 'The seat map is live: a seat someone else is choosing dims as you watch. Yours is held for you while you pay.' },
   story: { kicker: 'The theatre', heading: 'Eight screens. One good night out.', paragraphs: ['Laser projection and Dolby Atmos in Auditoriums 1 and 4. Heated recliners in 2. A screening room you can hire in 8.', 'Wheelchair spaces and companion seats are on every seat map.'] },
