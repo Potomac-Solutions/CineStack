@@ -33,6 +33,8 @@ export const theatre = {
   address: '1 Marquee Lane, Hemlock Ridge, Maryland',
   timeZone: 'America/New_York',
   concept: 'Concept by Potomac Solutions. Hemlock Ridge Cinema 8 is a made-up theatre; nothing here is really for sale.',
+  /** Listed in search engines? Off for a made-up theatre; a real one turns it on. */
+  listed: false,
 };
 
 export const auditoriums = [
@@ -80,3 +82,19 @@ export function showings(day = new Date()) {
     }),
   );
 }
+
+/** Every word on the landing page that isn't a film or a time. Change the page here, not in src/site.js. */
+export const site = {
+  description: 'Tonight’s films and showtimes at Hemlock Ridge Cinema 8. Pick your exact seats, pay, and show the code on your phone at the door.',
+  short: 'Hemlock Ridge',
+  trade: 'Cinema 8',
+  cta: 'Get tickets',
+  doors: 'Doors open 3:30 pm, every day',
+  hero: { kicker: 'Hemlock Ridge, Maryland · eight screens', title: 'Your seat is saved', titleSoft: 'before you leave the house.', lede: 'Pick a film, pick a time, pick the exact seat. Your ticket is on your phone.', secondary: 'How it works' },
+  tonight: { kicker: 'Now showing', heading: 'Tonight', lede: 'Pick a time to choose your seats.' },
+  seats: { kicker: 'No more front row', heading: 'Choose the exact seat.', text: 'The seat map is live: a seat someone else is choosing dims as you watch. Yours is held for you while you pay.' },
+  story: { kicker: 'The theatre', heading: 'Eight screens. One good night out.', paragraphs: ['Laser projection and Dolby Atmos in Auditoriums 1 and 4. Heated recliners in 2. A screening room you can hire in 8.', 'Wheelchair spaces and companion seats are on every seat map.'] },
+  steps: { heading: 'How it works', list: [['Pick a time', 'Every film, every showing tonight.'], ['Choose your seats', 'On the live seat map. Held while you pay.'], ['Show your code', 'On your phone, at the door. No printing.']] },
+  visit: { kicker: 'Find us', heading: 'Visit', where: 'Free parking behind the building. The box office is inside on the left.' },
+  foot: { line: 'Eight screens in Hemlock Ridge. Pick your seat before you leave the house.', built: 'Built by Potomac Solutions', builtHref: 'https://potomac.solutions' },
+};
