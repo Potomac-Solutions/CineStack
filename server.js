@@ -21,6 +21,10 @@ import { loadQr } from '@journey-to-code/symbology';
 import { createBoxOffice } from './src/box-office.js';
 import { sessions } from './src/session.js';
 import { layout, escape } from './src/layout.js';
+import { shell } from './src/shell.js';
+import { cards } from './src/tables.js';
+import { serveAsset } from './src/assets.js';
+import { landing } from './src/site.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const components = join(here, 'src', 'components');
@@ -87,7 +91,7 @@ export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'cines
   function bookPage(p, showing, booking, problem) {
     const film = boxOffice.film(showing.film);
     const cart = { lines: booking.units.map((seat, i) => ({ item: seat, qty: 1, name: `Seat ${seat}`, total: booking.lines[i]?.cents ?? 0 })), cents: booking.cents, ready: booking.state === 'held' || booking.state === 'failed' };
-    return `<section>
+    return `<section class="page-head">
   <a class="back" href="/show/${showing.id}">Back to the seats</a>
   <h1>${escape(film.title)}</h1>
   <p class="lede">${time(showing.starts)} · ${escape(boxOffice.hall(showing.auditorium).name)} · held for you until ${time(booking.until)}</p>
@@ -97,7 +101,7 @@ ${p.render('checkout-form', { cart, place: `/book/${showing.id}`, checkout: book
 
   /** The door: scan a ticket's code, from a photo or typed. For a door-shift device. */
   function doorPage(p, result) {
-    return `<section>
+    return `<section class="page-head">
   <h1>Door</h1>
   <p class="lede">Scan each ticket once. A ticket that has been used says when.</p>
 </section>
@@ -123,30 +127,26 @@ ${p.render('door-scanner', { resultNow: result ?? {}, timeZone: boxOffice.theatr
   ${ticket.name ? `<p class="lede">Booked by ${escape(ticket.name)}.</p>` : ''}
 </section>`;
   }
-  const page = (res, p, title, body) => send(res, 200, p.finish(layout({ title, theatre: boxOffice.theatre, body, actionsScript: actions.script() })));
-  const pages = staffPages({ staff, notices, proxies, home: '/staff/door', business: boxOffice.theatre.name, secure: production, render: (res, title, body) => page(res, zubra.page(), title, body) });
+  const page = (res, p, title, body, options = {}) => send(res, 200, p.finish(layout({ title, theatre: boxOffice.theatre, body, actionsScript: actions.script(), ...options })));
+  // The staff's side (the door, and the kit's people and password pages) has its own frame.
+  const staffPage = (res, p, title, body, who, options = {}) => send(res, 200, p.finish(shell({ title, theatre: boxOffice.theatre, body: cards(body), who, owner: staff.can(who, 'owner'), actionsScript: actions.script(), ...options })));
+  const pages = staffPages({ staff, notices, proxies, home: '/staff/door', business: boxOffice.theatre.name, secure: production, render: (res, title, body) => (staff.can(res.who, 'staff') ? staffPage(res, zubra.page(), title, body, res.who, { here: title === 'People' ? '/staff/people' : '' }) : page(res, zubra.page(), title, `<div class="auth">${body}</div>`)) });
 
   function home(p, guest) {
-    const mine = boxOffice.ticketsFor(guest);
-    const tickets = mine.length
-      ? `<section class="mine"><h2>Your tickets</h2><ul>${mine
-          .map((ticket) => `<li><a href="/ticket/${ticket.key}"><strong>${escape(ticket.film.title)}</strong> ${time(ticket.showing.starts)} · ${escape(ticket.hall.name)} · ${ticket.units.length === 1 ? 'Seat' : 'Seats'} ${escape(ticket.units.join(', '))}${ticket.status === 'scanned' ? ' · used' : ''}</a></li>`)
-          .join('')}</ul></section>`
-      : '';
+    const mine = boxOffice
+      .ticketsFor(guest)
+      .map((ticket) => `<li><a href="/ticket/${ticket.key}"><strong>${escape(ticket.film.title)}</strong> ${time(ticket.showing.starts)} · ${escape(ticket.hall.name)} · ${ticket.units.length === 1 ? 'Seat' : 'Seats'} ${escape(ticket.units.join(', '))}${ticket.status === 'scanned' ? ' · used' : ''}</a></li>`)
+      .join('');
     const byFilm = new Map();
     for (const showing of boxOffice.showings()) {
       if (!byFilm.has(showing.film)) byFilm.set(showing.film, []);
       byFilm.get(showing.film).push(showing);
     }
-    const cards = [...byFilm].map(([id, list]) => {
-      const film = boxOffice.film(id);
-      const times = list
-        .sort((a, b) => a.starts - b.starts)
-        .map((showing) => `<li><a href="/show/${showing.id}">${time(showing.starts)}<small>${escape(boxOffice.hall(showing.auditorium).name)}</small></a></li>`)
-        .join('');
-      return `<li class="film">${film.label ? `<span class="tag">${escape(film.label)}</span>` : ''}<h2>${escape(film.title)}</h2><p>${escape(film.rating)} · ${film.minutes} min</p><ul class="times">${times}</ul></li>`;
-    });
-    return `${tickets}<section><h1>Tonight</h1><p class="lede">Pick a time to choose your seats.</p></section><ul class="films">${cards.join('')}</ul>`;
+    const films = [...byFilm].map(([id, list]) => ({
+      ...boxOffice.film(id),
+      showings: list.sort((a, b) => a.starts - b.starts).map((showing) => ({ id: showing.id, at: time(showing.starts), hall: boxOffice.hall(showing.auditorium).name })),
+    }));
+    return landing({ theatre: boxOffice.theatre, films, halls: [...new Set(boxOffice.showings().map((showing) => showing.auditorium))].map((id) => boxOffice.hall(id)), money, seatCents: boxOffice.seatCents, mine });
   }
 
   function show(p, showing, guest, problem) {
@@ -158,7 +158,7 @@ ${p.render('door-scanner', { resultNow: result ?? {}, timeZone: boxOffice.theatr
       cells: row.cells.map((cell) => (cell.gap ? cell : { ...cell, ...(taken.get(cell.id) ?? { state: 'free', by: '', until: 0 }) })),
     }));
     const held = boxOffice.held(guest, showing.id);
-    return `<section>
+    return `<section class="page-head">
   <a class="back" href="/">All showings</a>
   <h1>${escape(film.title)}</h1>
   <p class="lede">${time(showing.starts)} · ${escape(hall.name)} · ${escape(film.rating)} · ${film.minutes} min</p>
@@ -174,7 +174,12 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
       if (await actions.handle(req, res)) return;
       if (zubra.handle(req, res)) return;
       const url = new URL(req.url, 'http://localhost');
+      if (serveAsset(req, res, url)) return;
+      // A made-up theatre asks not to be listed; a real one (theatre.listed) lists its public pages only.
+      if (url.pathname === '/robots.txt') return res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' }).end(boxOffice.theatre.listed ? 'User-agent: *\nDisallow: /staff\nDisallow: /book\nDisallow: /ticket\n' : 'User-agent: *\nDisallow: /\n');
+      // Pages name their icon (public/favicon.svg); a bare request for the old address gets nothing.
       if (url.pathname === '/favicon.ico') return res.writeHead(204).end();
+      res.who = staff.session(req);
       const file = served.get(url.pathname);
       if (file) {
         res.writeHead(200, { 'content-type': file[0], 'cache-control': 'public, max-age=3600' });
@@ -213,7 +218,7 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
       const problem = result?.value?.error ?? (result?.error ? 'That didn’t go through. Try again.' : '');
       const p = zubra.page();
 
-      if (url.pathname === '/') return page(res, p, 'Tonight', home(p, guest));
+      if (url.pathname === '/') return page(res, p, 'Tonight', home(p, guest), { landing: true });
       const match = url.pathname.match(/^\/show\/([\w-]+)$/);
       const showing = match && boxOffice.showing(match[1]);
       if (showing) return page(res, p, boxOffice.film(showing.film).title, show(p, showing, guest, problem));
@@ -225,8 +230,8 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
       }
       if (url.pathname === '/staff/door') {
         const who = staff.session(req);
-        if (!staff.can(who, 'staff')) return page(res, p, 'Sign in', pages.signIn(url));
-        return page(res, p, 'Door', pages.bar(who) + doorPage(p, result?.value ?? (result?.error ? { error: 'That didn’t go through. Try again.' } : null)));
+        if (!staff.can(who, 'staff')) return page(res, p, 'Sign in', `<div class="auth">${pages.signIn(url)}</div>`);
+        return staffPage(res, p, 'Door', pages.bar(who) + doorPage(p, result?.value ?? (result?.error ? { error: 'That didn’t go through. Try again.' } : null)), who, { here: '/staff/door' });
       }
       const ticketMatch = url.pathname.match(/^\/ticket\/([\w-]+)$/);
       const ticket = ticketMatch && boxOffice.ticket(guest, ticketMatch[1]);

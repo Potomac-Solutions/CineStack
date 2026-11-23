@@ -1,86 +1,74 @@
-// The page around the components: the theatre's frame, and the connection to the Sync log.
-export const escape = (value) =>
-  String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+// The page around the components: the head, the bar across the top, the foot, and the connection
+// to the log. The styles are files in public/ (base.css for every page, site.css for the landing
+// page, customer.css for the seats, paying and a ticket); the words come from src/seed.js.
+import { asset, photo, FONT_CSS } from './assets.js';
+import { site } from './seed.js';
 
-const STYLE = `
-  :root {
-    --background: #14161b; --foreground: #eceef3; --card: #20232b; --border: #333847; --muted-foreground: #9299ab;
-    --accent: #ffd166; --seat-mine: var(--accent);
-    --primary: var(--accent); --primary-foreground: #1a1c22; --ring: var(--accent); --input: var(--border); --muted: #2a2e38; --radius: 0.75rem;
-    color-scheme: dark;
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 1.0625rem; line-height: 1.5; background: var(--background); color: var(--foreground); }
-  a { color: inherit; }
-  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-  .concept { margin: 0; padding: 0.45rem 1rem; background: var(--accent); color: #1a1c22; font-size: 0.85rem; font-weight: 600; text-align: center; }
-  .site-head { display: flex; align-items: baseline; gap: 1rem; padding: 1rem clamp(1rem, 4vw, 2.5rem); border-bottom: 1px solid var(--border); }
-  .site-head a { font-size: 1.35rem; font-weight: 800; letter-spacing: 0.01em; text-decoration: none; }
-  .site-head span { color: var(--muted-foreground); font-size: 0.9rem; }
-  @media (max-width: 30rem) { .site-head span { display: none; } }
-  main { width: min(64rem, 100% - 2 * clamp(1rem, 4vw, 2.5rem)); margin: 0 auto; padding: 2rem 0 5rem; display: grid; gap: 2rem; }
-  h1 { margin: 0; font-size: clamp(1.9rem, 5vw, 2.75rem); line-height: 1.1; }
-  h2 { margin: 0; font-size: 1.3rem; }
-  .lede { margin: 0.4rem 0 0; color: var(--muted-foreground); }
-  .films { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); padding: 0; margin: 0; list-style: none; }
-  .film { display: grid; gap: 0.6rem; padding: 1.1rem 1.2rem; border-radius: 0.75rem; background: var(--card); box-shadow: 0 0 0 1px var(--border); }
-  .film p { margin: 0; color: var(--muted-foreground); font-size: 0.9rem; }
-  .tag { color: var(--accent); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-  .times { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0; margin: 0; list-style: none; }
-  .times a { display: grid; padding: 0.4rem 0.75rem; border-radius: 0.5rem; box-shadow: 0 0 0 1px var(--border); text-decoration: none; font-weight: 700; line-height: 1.25; }
-  .times a:hover { box-shadow: 0 0 0 1px var(--accent); }
-  .times small { font-weight: 400; color: var(--muted-foreground); }
-  .specs { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0; margin: 0.6rem 0 0; list-style: none; }
-  .specs li { padding: 0.15rem 0.6rem; border-radius: 999px; box-shadow: 0 0 0 1px var(--border); font-size: 0.85rem; color: var(--muted-foreground); }
-  .back { color: var(--muted-foreground); font-size: 0.9rem; }
-  .ticket { display: grid; gap: 0.75rem; justify-items: start; }
-  .ticket .seats { margin: 0; font-size: 1.15rem; }
-  .ticket .qr { width: min(18rem, 100%); padding: 0.75rem; border-radius: 0.75rem; background: #fff; color: #000; }
-  .ticket .qr svg { display: block; width: 100%; height: auto; }
-  .photo { display: inline-grid; gap: 0.35rem; font-weight: 600; }
-  .notice-text:empty { display: none; }
-  .notice-text { margin: 0; color: #ffd9dc; }
-  .start { font: inherit; font-weight: 700; padding: 0.7rem 1.2rem; border: 0; border-radius: 0.5rem; background: var(--accent); color: #1a1c22; cursor: pointer; }
-  .mine { display: grid; gap: 0.6rem; padding: 1rem 1.2rem; border-radius: 0.75rem; background: var(--card); box-shadow: 0 0 0 1px var(--accent); }
-  .mine h2 { margin: 0; font-size: 1.1rem; }
-  .mine ul { display: grid; gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
-  .mine a { text-decoration: none; }
-  .mine a:hover strong { color: var(--accent); }
-  .site-foot { padding: 1.5rem clamp(1rem, 4vw, 2.5rem) 2.5rem; color: var(--muted-foreground); font-size: 0.9rem; }
-  .notice { margin: 0; padding: 0.6rem 0.9rem; border-radius: 0.5rem; background: #4a1f24; color: #ffd9dc; }
-  /* The kit's staff pages: sign-in, links, people, passwords. */
-  .panel { display: grid; gap: 0.9rem; align-content: start; padding: 1.1rem 1.2rem; border-radius: var(--radius); background: var(--card); box-shadow: 0 0 0 1px var(--border); }
-  .panel table { width: 100%; border-collapse: collapse; }
-  .panel td, .panel th { padding: 0.5rem 0.4rem; border-top: 1px solid var(--border); text-align: left; vertical-align: top; }
-  .panel .done { opacity: 0.55; }
-  .ok { margin: 0; padding: 0.6rem 0.9rem; border-radius: 0.5rem; background: #183a26; color: #c9f2d8; }
-  .bulletin { margin: 0; padding: 0.6rem 0.9rem; border-radius: 0.5rem; background: var(--muted); }
-  .hint { margin: 0; color: var(--muted-foreground); font-size: 0.9rem; }
-  .row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-  .inline { display: inline; }
-  .panel label { display: grid; gap: 0.3rem; font-weight: 600; }
-  .panel input, .panel select { font: inherit; padding: 0.55rem 0.7rem; border-radius: 0.5rem; border: 1px solid var(--border); background: var(--muted); color: inherit; }
-  .panel button, .button { font: inherit; font-weight: 700; padding: 0.6rem 1.1rem; border: 0; border-radius: 0.5rem; background: var(--accent); color: #1a1c22; cursor: pointer; text-decoration: none; justify-self: start; }
-  .button.light { background: var(--muted); color: var(--foreground); padding: 0.3rem 0.7rem; }
-`;
+export const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-export function layout({ title, theatre, body, actionsScript = '' }) {
+/** Small drawings, as inline SVG: they take the theatre's colours. Photographs are files in public/photos/. */
+export const art = {
+  mark: '<svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#07080b"/><rect x="10" y="18" width="44" height="28" rx="4" fill="none" stroke="#ffd166" stroke-width="4"/><path d="M27 25v14l12-7z" fill="#ffd166"/><circle cx="16" cy="52" r="2.5" fill="#ffd166"/><circle cx="32" cy="52" r="2.5" fill="#ffd166"/><circle cx="48" cy="52" r="2.5" fill="#ffd166"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.800 7 11 7 11z"/><circle cx="12" cy="10" r="2.500"/></svg>',
+  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h4l1.500 5-2.200 1.600a12 12 0 0 0 5.100 5.100L16 12.500l5 1.500v4a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/></svg>',
+};
+
+const wordmark = (shop) => `<a class="wordmark" href="/">${art.mark}<span><b>${escape(site.short)}</b><small>${escape(site.trade)}</small></span></a>`;
+
+/** What a search engine or a shared link should know about the shop. Off for a made-up shop. */
+function listing(shop, canonical) {
+  if (!shop.listed) return '<meta name="robots" content="noindex, nofollow">';
+  const data = { '@context': 'https://schema.org', '@type': 'LocalBusiness', name: shop.name, description: site.description, address: { '@type': 'PostalAddress', addressLocality: shop.town.split(',')[0], addressRegion: (shop.town.split(',')[1] ?? '').trim() }, ...(canonical ? { url: canonical } : {}) };
+  return `${canonical ? `<link rel="canonical" href="${escape(canonical)}">` : ''}<script type="application/ld+json">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>`;
+}
+
+/**
+ * `nav`: who is looking: `customer` (signed in), `staff` (on the staff). `here` marks the current
+ * link. `landing` is the landing page: full-width sections and its own stylesheet. `toast` is a
+ * signed "done" message to float.
+ */
+export function layout({ title, theatre: shop, body, here = '', landing = false, toast = '', description = site.description, canonical = '', actionsScript = '' }) {
+  const link = (href, words, cls = '') => `<a href="${href}"${cls ? ` class="${cls}"` : ''}${here === href ? ' aria-current="page"' : ''}>${words}</a>`;
+  const links = [link('/#tonight', 'Tonight', 'wide'), link('/#how', 'How it works', 'wide'), link('/#story', 'The theatre', 'wide'), link('/#visit', 'Visit')].join('');
+  const fullTitle = landing ? `${shop.name} · ${shop.town}` : `${title} · ${shop.name}`;
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex, nofollow">
-  <title>${escape(title)} · ${escape(theatre.name)}</title>
-  <style>${STYLE}</style>
+  ${listing(shop, canonical)}
+  <title>${escape(fullTitle)}</title>
+  <meta name="description" content="${escape(description)}">
+  <meta property="og:title" content="${escape(fullTitle)}">
+  <meta property="og:description" content="${escape(description)}">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#07080b">
+  <link rel="icon" href="${asset('favicon.svg')}" type="image/svg+xml">
+  <link rel="preload" href="${asset('big-shoulders-display-latin-800-normal.woff2')}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="${asset('manrope-latin-400-normal.woff2')}" as="font" type="font/woff2" crossorigin>${landing && photo('hero') ? `
+  <link rel="preload" href="${photo('hero')}" as="image" fetchpriority="high">
+  <meta property="og:image" content="${escape(canonical ? new URL(photo('hero'), canonical).href : photo('hero'))}">` : ''}
+  <style>${FONT_CSS}</style>
+  <link rel="stylesheet" href="${asset('base.css')}">
+  <link rel="stylesheet" href="${asset(landing ? 'site.css' : 'customer.css')}">
 </head>
 <body>
-  <p class="concept">${escape(theatre.concept)}</p>
-  <header class="site-head"><a href="/">${escape(theatre.name)}</a><span>${escape(theatre.town)}</span></header>
-  <main>
+  <a class="skip" href="#main">Skip to the page</a>
+  <header class="site-head"><div class="wrap bar">${wordmark(shop)}<nav aria-label="Site">${links}<a class="bag" href="/#tonight"><span class="long">${escape(site.cta)}</span><span class="short">Tickets</span></a></nav></div></header>
+  <main id="main"${landing ? ' class="landing"' : ''}>
     ${body}
   </main>
-  <footer class="site-foot"><a href="/">Tonight</a> · <a href="/staff/door">The door (staff)</a></footer>
+  ${toast ? `<p class="toast" role="status">${escape(toast)}</p>` : ''}
+  <footer class="site-foot"><div class="wrap">
+    <div class="cols">
+      <div>${wordmark(shop)}<p>${escape(site.foot.line)}</p><p>${escape(shop.town)}</p><p><a class="go" href="/#tonight">${escape(site.cta)}</a></p></div>
+      <div><h2>Doors</h2><p>${escape(site.doors)}</p><p>${escape(shop.address)}</p></div>
+      <div><h2>Tickets</h2><ul><li><a href="/#tonight">Tonight’s showtimes</a></li><li><a href="/#how">How it works</a></li><li><a href="/#visit">Find us</a></li></ul></div>
+      <div><h2>Staff</h2><ul><li><a href="/staff/door">The door</a></li></ul></div>
+    </div>
+    <div class="fine"><p>${escape(shop.concept)}</p><p><a href="${escape(site.foot.builtHref)}">${escape(site.foot.built)}</a></p></div>
+  </div></footer>
   ${actionsScript}
   <script type="module">
     import { connect } from '@zubra/sync/connect';
