@@ -44,6 +44,14 @@ Every seat is $11.00 for now. Prices, snacks, trailers, the lobby boards and the
 | `src/log.js` | The Sync log in one SQLite table, one row per field |
 | `src/seed.js` | The theatre, its auditoriums and their seat layouts, as data |
 
+## How it looks
+
+- **The landing page** (`/`) is photo-led: the auditorium, one line and one button (**Get tickets**), then tonight's films, each with a still, its rating and every showtime as a button straight to the seats. Below: choosing the exact seat, the theatre, how it works, and where it is. Its words are `site` in `src/seed.js`; `src/site.js` lays it out.
+- **Photographs** are files in `public/photos/`: `hero`, `seats`, `marquee`, and one still per film named by the film's id (`night-ferry`), as `.jpg` or `.webp`. Replace a file and restart. The ones here were generated for this made-up theatre and its made-up films; see `public/photos/README.md`.
+- **Type** is Big Shoulders Display and Manrope, self-hosted from `@fontsource`. The house is dark for guests; the colours are tokens at the top of `public/base.css`.
+- **The door** has its own page frame (`src/shell.js`): a sidebar at a desk, a bar and a sheet on a phone, light or dark following the device, with a switch that remembers.
+- **Checks.** With the app running and an owner set up, `OWNER=email,password npm run design-check` walks every page, holds a seat on the way, and checks five widths in light and dark.
+
 ## Run it
 
 ```sh
