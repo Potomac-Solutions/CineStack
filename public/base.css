@@ -234,3 +234,15 @@ h1, h2, h3, .wordmark b { letter-spacing: 0.01em; }
 /* The house's own shapes: ticket-stub corners, not pills. */
 body :is(button:not(.action-button), .button, .go, .bag) { border-radius: 0.4rem; }
 .site-head { box-shadow: inset 0 -1px 0 rgb(var(--glow-rgb) / 0.45); }
+
+/* Every showtime is a ticket stub: notched at both ends, with a perforation before the auditorium. */
+.times a { grid-template-columns: auto auto; justify-content: start; align-items: center; column-gap: 0.7rem; padding-inline: 1rem; border-radius: 4px; -webkit-mask: radial-gradient(circle 7px at 0 50%, #0000 97%, #000) left / 51% 100% no-repeat, radial-gradient(circle 7px at 100% 50%, #0000 97%, #000) right / 51% 100% no-repeat; mask: radial-gradient(circle 7px at 0 50%, #0000 97%, #000) left / 51% 100% no-repeat, radial-gradient(circle 7px at 100% 50%, #0000 97%, #000) right / 51% 100% no-repeat; }
+.times a small { padding-left: 0.7rem; border-left: 1.5px dashed currentColor; }
+body .go.lg { border-radius: 4px; -webkit-mask: radial-gradient(circle 7px at 0 50%, #0000 97%, #000) left / 51% 100% no-repeat, radial-gradient(circle 7px at 100% 50%, #0000 97%, #000) right / 51% 100% no-repeat; mask: radial-gradient(circle 7px at 0 50%, #0000 97%, #000) left / 51% 100% no-repeat, radial-gradient(circle 7px at 100% 50%, #0000 97%, #000) right / 51% 100% no-repeat; padding-inline: 1.6rem; }
+
+/* The mark, once more in the footer: large and faint, behind the columns. */
+.site-foot { position: relative; overflow: hidden; isolation: isolate; }
+.site-foot::before { content: ""; position: absolute; z-index: -1; inset: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='4 11 56 42'%3E%3Cpath d='M10 13h44a4 4 0 0 1 4 4v10a5 5 0 0 0 0 10v10a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4V37a5 5 0 0 0 0-10V17a4 4 0 0 1 4-4z' fill='none' stroke='%23a78bfa' stroke-width='1.2'/%3E%3Cpath d='M45 18v28' stroke='%23a78bfa' stroke-width='1' stroke-dasharray='3 3.5'/%3E%3C/svg%3E") right -2rem bottom -3rem / 26rem auto no-repeat; opacity: 0.16; pointer-events: none; }
+
+/* Sign-in pages, for customers and for staff, open with the mark. */
+.auth::before { content: ""; justify-self: center; width: 4.5rem; aspect-ratio: 1; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M10 13h44a4 4 0 0 1 4 4v10a5 5 0 0 0 0 10v10a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4V37a5 5 0 0 0 0-10V17a4 4 0 0 1 4-4z' fill='%23a78bfa'/%3E%3Ccircle cx='27' cy='25.500' r='5' fill='none' stroke='%2307080b' stroke-width='4'/%3E%3Ccircle cx='27' cy='38.500' r='6.500' fill='none' stroke='%2307080b' stroke-width='4'/%3E%3Cpath d='M45 18v28' stroke='%2307080b' stroke-width='2.400' stroke-dasharray='3 3.500'/%3E%3C/svg%3E") center / contain no-repeat; }
