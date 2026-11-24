@@ -28,8 +28,8 @@
   .recliner span { border-radius: 0.6rem 0.6rem 0.2rem 0.2rem; box-shadow: inset 0 -5px 0 rgb(0 0 0 / 0.3); }
   .wheelchair span, .companion span { outline: 2px dashed var(--seat-access, #7fb4ff); outline-offset: -2px; }
   label:hover span { transform: translateY(-1px); }
-  input:focus-visible + span { outline: 3px solid var(--seat-focus, #ffd166); outline-offset: 2px; }
-  .mine span { background: var(--seat-mine, #ffd166); color: #1a1c22; font-weight: 700; }
+  input:focus-visible + span { outline: 3px solid var(--seat-focus, #a78bfa); outline-offset: 2px; }
+  .mine span { background: var(--seat-mine, #a78bfa); color: #1a1c22; font-weight: 700; }
   .gone { cursor: not-allowed; }
   .gone span { background: var(--seat-gone, #1e2026); color: var(--seat-gone-ink, #5b6170); box-shadow: none; transform: none; }
   @media (prefers-reduced-motion: reduce) { span { transition: none; } }
