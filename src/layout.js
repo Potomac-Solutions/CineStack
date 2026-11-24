@@ -8,7 +8,7 @@ export const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => 
 
 /** Small drawings, as inline SVG: they take the theatre's colours. Photographs are files in public/photos/. */
 export const art = {
-  mark: '<svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#07080b"/><rect x="10" y="18" width="44" height="28" rx="4" fill="none" stroke="#ffd166" stroke-width="4"/><path d="M27 25v14l12-7z" fill="#ffd166"/><circle cx="16" cy="52" r="2.5" fill="#ffd166"/><circle cx="32" cy="52" r="2.5" fill="#ffd166"/><circle cx="48" cy="52" r="2.5" fill="#ffd166"/></svg>',
+  mark: '<svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#07080b"/><rect x="10" y="18" width="44" height="28" rx="4" fill="none" stroke="#a78bfa" stroke-width="4"/><path d="M27 25v14l12-7z" fill="#a78bfa"/><circle cx="16" cy="52" r="2.5" fill="#a78bfa"/><circle cx="32" cy="52" r="2.5" fill="#a78bfa"/><circle cx="48" cy="52" r="2.5" fill="#a78bfa"/></svg>',
   clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.800 7 11 7 11z"/><circle cx="12" cy="10" r="2.500"/></svg>',
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h4l1.500 5-2.200 1.600a12 12 0 0 0 5.100 5.100L16 12.500l5 1.500v4a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/></svg>',

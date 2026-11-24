@@ -135,3 +135,6 @@
 .film h3 { font-size: 1.9rem; font-weight: 800; line-height: 1; text-transform: uppercase; }
 .film .meta { margin: 0; color: var(--muted-foreground); font-size: 0.9rem; }
 .hero h1, .banner h2, .big { text-transform: uppercase; }
+
+/* The hero's second half is drawn in outline, like the unlit letters on a marquee. */
+.hero h1 em { color: var(--glow); -webkit-text-fill-color: transparent; -webkit-text-stroke: 2px var(--glow); text-shadow: none; }
