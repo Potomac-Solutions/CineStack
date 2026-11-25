@@ -78,7 +78,7 @@ For a real business, leave out `DEMO`, set `DATA_DIR` to a mounted volume, start
 | `@zubra/server` | Renders each page, seats included, before any JavaScript runs |
 | `@zubra/actions` | `choose` in `seat-chart.zb` is a `'use server'` function: a plain form post, or a fetch |
 | `@zubra/sync` | Each seat is a document only the server writes; phones follow it live |
-| [Potomac kit](https://github.com/Potomac-Solutions/kit) (private) | `hold` (who gets a seat, and when a hold ends), `reserve` (seats held at a showing as a draft, priced, then paid once and sold), `pay` (charged at most once; its test provider) and `stages` (a ticket: booked, then scanned). The payment page is the kit's `checkout-form`, loaded from the package |
+| Potomac kit (private) | `hold` (who gets a seat, and when a hold ends), `reserve` (seats held at a showing as a draft, priced, then paid once and sold), `pay` (charged at most once; its test provider) and `stages` (a ticket: booked, then scanned). The payment page is the kit's `checkout-form`, loaded from the package |
 | [symbology](https://github.com/journey-to-code-org/symbology) | Draws the ticket's QR code (the ticket's key) on the server, and decodes it at the door in the browser (`src/door.js`) |
 | `src/box-office.js` | The theatre's side: which seats and showings exist, the guest's draft, and the words |
 | `src/log.js` | The Sync log in one SQLite table, one row per field |
@@ -96,7 +96,7 @@ For a real business, leave out `DEMO`, set `DATA_DIR` to a mounted volume, start
 ## Run it
 
 ```sh
-npm install      # needs read access to the private Potomac-Solutions/kit repository
+npm install      # needs read access to the private Potomac kit repository
 npm start        # http://localhost:3000
 npm test         # needs Chrome or Playwright's Chromium
 ```
