@@ -85,7 +85,11 @@ async function buy(b, seats, { name = 'Pat Quill', email = 'pat@example.com' } =
   const html = (await b.get(`/book/${showing}`)).text;
   const checkout = /name="checkout" value="(b[a-z0-9]+)"/.exec(html)?.[1];
   assert.ok(checkout, 'the payment page has the booking');
-  const paid = await b.post(`/book/${showing}`, { checkout, name, email, card: '4242 4242 4242 4242' });
+  const started = await b.post(`/book/${showing}`, { checkout, name, email });
+  // The test payment page, standing in for Stripe's: "Pay", then the way back.
+  const ref = new URL(started.location, 'http://x').searchParams.get('ref');
+  const back = new URL((await b.post('/pay/test', { ref, answer: 'pay' })).location);
+  const paid = await b.get(back.pathname + back.search);
   const key = /^\/ticket\/(b[a-z0-9]+)$/.exec(paid.location)?.[1];
   assert.ok(key, paid.location);
   return { key, html };

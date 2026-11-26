@@ -83,9 +83,20 @@ async function phone(site, name, { javaScriptEnabled = true } = {}) {
     return { checkout: key ?? '', name: name, email: 'guest@example.com', card };
   };
   /** Post the payment form; where the server sends the guest. */
+  // Sent on to the test payment page (standing in for Stripe's): "Pay", or for the declining
+  // card "Go back without paying", then the way back.
   const pay = async (form, headers = {}) => {
     const response = await context.request.post(`${site.base}/book/${site.showing}`, { form, headers, maxRedirects: 0 });
-    return { status: response.status(), location: plain(response.headers().location ?? '') };
+    const location = plain(response.headers().location ?? '');
+    if (!location.startsWith('/pay/test')) return { status: response.status(), location };
+    const page = await (await context.request.get(`${site.base}${location}`)).text();
+    assert.match(page, /Once Stripe is set up, this page is Stripe’s own\./);
+    const ref = new URL(location, site.base).searchParams.get('ref');
+    const next = String(form.card ?? '').replace(/\D/g, '') === '4000000000000002'
+      ? /href="([^"]+)">Go back without paying/.exec(page)[1].replaceAll('&amp;', '&')
+      : (await context.request.post(`${site.base}/pay/test`, { form: { ref, answer: 'pay' }, maxRedirects: 0 })).headers().location;
+    const back = await context.request.get(new URL(next, site.base).href, { maxRedirects: 0 });
+    return { status: back.status(), location: plain(back.headers().location ?? '') };
   };
   return { context, page, choose, checkout, pay, seat: (id) => page.locator(`input[name=seat][value=${id}]`) };
 }
@@ -254,8 +265,10 @@ test('without JavaScript: hold seats, pay, and get a ticket; the seats are sold 
   assert.match(await guest.page.locator('checkout-form').innerText(), new RegExp(`Seat ${a}[\\s\\S]*Seat ${b}[\\s\\S]*\\$22\\.00`));
   await guest.page.fill('checkout-form input[name=name]', 'Rosa');
   await guest.page.fill('checkout-form input[name=email]', 'rosa@example.com');
-  await guest.page.fill('checkout-form input[name=card]', '4242 4242 4242 4242');
+  assert.equal(await guest.page.locator('checkout-form input[name=card]').count(), 0, 'no card is typed here');
   await guest.page.click('checkout-form button[type=submit]');
+  await guest.page.waitForURL(/\/pay\/test\?ref=/);
+  await guest.page.click('button:has-text("Pay $22.00")');
   await guest.page.waitForURL(/\/ticket\/b[a-z0-9]+$/);
   assert.match(await guest.page.locator('.ticket').innerText(), new RegExp(`Seats ${a}, ${b} · \\$22\\.00[\\s\\S]*Booked by Rosa`));
   // The code is the ticket's key, drawn by symbology, and reads back as it.
@@ -289,14 +302,14 @@ test('without JavaScript: hold seats, pay, and get a ticket; the seats are sold 
   await other.context.close();
 });
 
-test('a declined card books nothing: the seats stay held, to try another card', async () => {
+test('backing out of the payment page books nothing: the seats stay held, to try again', async () => {
   const guest = await phone(app, 'declined', { javaScriptEnabled: false });
   const [a, b] = freeSeats(app, 2, 'G');
   assert.equal((await guest.choose({ toggle: a })).body.ok, true);
   assert.equal((await guest.choose({ toggle: b })).body.ok, true);
   const form = await guest.checkout('4000 0000 0000 0002');
   assert.match(form.checkout, /^b[a-z0-9]+$/);
-  assert.equal((await guest.pay(form)).location, `/book/${app.showing}?problem=That card was declined. Try another.`);
+  assert.equal((await guest.pay(form)).location, `/book/${app.showing}?problem=Nothing was charged. Your seats are still held for a few minutes.`);
   assert.equal(app.server.boxOffice.taken(app.showing).get(a).state, 'held', 'still held');
 
   // Another guest can't pay for these seats with this guest's checkout, and another site can't post at all.

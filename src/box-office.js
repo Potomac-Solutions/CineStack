@@ -44,7 +44,18 @@ export const MAX_SEATS = 8;
 /** Seats in the order people say them: by row, then by number (C8 before C10). */
 const bySeat = (a, b) => a.replace(/\d+$/, '').localeCompare(b.replace(/\d+$/, '')) || parseInt(a.match(/\d+$/)[0], 10) - parseInt(b.match(/\d+$/)[0], 10);
 
-export function createBoxOffice({ db = ':memory:', holdMs = 5 * 60_000, sweepMs = 1000, today = new Date() } = {}) {
+const BOOK_WORDS = {
+  declined: 'That card was declined. Try another.',
+  lapsed: 'Your hold ran out and a seat went to someone else. Choose your seats again.',
+  'in-progress': 'Your booking is already going through.',
+  'lapsed-after-payment': 'Your hold ran out while the payment went through. The theatre will refund it.',
+  'not-paid': 'That payment didn’t go through, so nothing was charged. Your seats are still held.',
+  cancelled: 'Nothing was charged. Your seats are still held for a few minutes.',
+  'not-set-up': 'Paying online isn’t working right now. Buy at the box office.',
+  'provider-failed': 'The payment service didn’t answer. Try again in a minute.',
+};
+
+export function createBoxOffice({ db = ':memory:', holdMs = 5 * 60_000, sweepMs = 1000, today = new Date(), provider = testProvider() } = {}) {
   const log = fieldLog(db);
   const tick = serverClock(log.latestClock());
   const showings = new Map(seedShowings(today).map((showing) => [showing.id, showing]));
@@ -114,10 +125,14 @@ export function createBoxOffice({ db = ':memory:', holdMs = 5 * 60_000, sweepMs 
   const store = { get: log.get, under: log.under, write };
   // Who may scan is the app's to say (a door-shift device); the stage itself only goes once.
   const tickets = createStages({ store, collection: 'tickets', steps: ['booked', 'scanned'], may: ({ to }) => to === 'scanned' });
-  const reserve = createReserve({
+  // Paid on the platform's page (Stripe Checkout, with Link, for this theatre): `wanted` keeps a
+  // let-go booking from being taken.
+  let reserve;
+  const pay = createPay({ provider, store, wanted: (id) => reserve.wanted(id) });
+  reserve = createReserve({
     store,
     holds,
-    pay: createPay({ provider: testProvider(), store }),
+    pay,
     stages: tickets,
     // A seat's price: what a manager set from the admin, or the default.
     base: () => log.get('settings', 'theatre')?.seatCents ?? SEAT_CENTS,
@@ -203,7 +218,7 @@ export function createBoxOffice({ db = ':memory:', holdMs = 5 * 60_000, sweepMs 
      * Pay for the guest's held seats. Once paid, they're sold and the booking is a ticket. A
      * declined card books nothing; the seats stay held while the hold lasts, to try again.
      */
-    async book(guest, showingId, form) {
+    async book(guest, showingId, form, { back = '', cancel = '' } = {}) {
       if (!guest) return { error: 'Open the showing again to choose seats.' };
       const showing = showings.get(showingId);
       const found = showing && draft(guest, showing.id);
@@ -212,16 +227,42 @@ export function createBoxOffice({ db = ':memory:', holdMs = 5 * 60_000, sweepMs 
         method: { card: String(form.get('card') ?? '') },
         // What it was for is kept on the ticket, so reports can read it after the showing is gone.
         fields: { showing: showing.id, film: showing.film, starts: showing.starts, auditorium: showing.auditorium, customer: guest.customer ?? '', name: String(form.get('name') ?? '').trim().slice(0, 100), email: String(form.get('email') ?? '').trim().slice(0, 200) },
-        description: 'CineStack tickets (test mode)',
+        description: `CineStack tickets: ${filmsById.get(showing.film)?.title ?? 'a showing'}`,
+        back,
+        cancel,
       });
+      if (done.paying) return { ok: true, paying: true, pay: done.pay, ticket: found.key, showing: showing.id };
       if (done.ok) return { ok: true, ticket: found.key };
-      const words = {
-        declined: 'That card was declined. Try another.',
-        lapsed: 'Your hold ran out and a seat went to someone else. Choose your seats again.',
-        'in-progress': 'Your booking is already going through.',
-        'lapsed-after-payment': 'Your hold ran out while the payment went through. The theatre will refund it.',
-      };
-      return { error: words[done.error] ?? 'That didn’t go through. Try again.' };
+      return { error: BOOK_WORDS[done.error] ?? 'That didn’t go through. Try again.' };
+    },
+
+    /** Back from the platform's page, or its webhook: once it's paid, the seats are a ticket. */
+    async finish(key, { told } = {}) {
+      const booking = log.get('bookings', key);
+      if (!booking) return { error: 'Your seats aren’t held any more. Choose them again.' };
+      const done = await reserve.finish(key, { told });
+      if (done.ok) return { ok: true, ticket: key, again: Boolean(done.again) };
+      return { error: BOOK_WORDS[done.error] ?? 'That didn’t go through. Try again.', showing: booking.pools?.[0] };
+    },
+
+    /** The webhook from the platform: `{ headers, body, url }`. */
+    heard: (request) => reserve.heard(request),
+
+    /** Backed out of the platform's page: nothing charged; the seats stay held while the hold lasts. */
+    async cancel(guest, key) {
+      const booking = log.get('bookings', key);
+      if (!guest || !booking || booking.holder !== guest.pub) return { error: 'Your seats aren’t held any more. Choose them again.' };
+      const done = await reserve.stopPaying(guest.pub, key);
+      if (done.ok && done.state !== 'failed' && log.get('tickets', key)) return { ok: true, ticket: key };
+      return { error: BOOK_WORDS.cancelled, showing: booking.pools?.[0] };
+    },
+
+    /** A ticket by its key, whoever holds it (for the email once it's paid). */
+    ticketByKey(key) {
+      const record = log.get('tickets', key);
+      if (!record) return null;
+      const showing = showings.get(record.showing);
+      return { key, ...record, showing, film: filmsById.get(showing?.film), hall: halls.get(showing?.auditorium) };
     },
 
     /** How the box office tells who a request is from (the session cookie). */
