@@ -12,8 +12,8 @@ Choosing seats for a showing, paying for them, getting a ticket, and being let i
 - With JavaScript, a tap holds the seat at once, and everyone else looking at the showing sees it go without reloading.
 - Two people who tap the same seat at the same moment: the server gives it to one and tells the other.
 - A hold lasts five minutes. When it runs out, the server lets the seat go and every phone sees it come back.
-- Held seats show a **Book** button with the total. Paying is one form (test mode: no money moves; card `4000 0000 0000 0002` is declined). Once paid, the seats are sold for everyone, and the guest gets a ticket page with a QR code for the door.
-- A declined card books nothing and keeps the seats held, to try another card. A hold that runs out before paying books nothing.
+- Held seats show a **Book** button with the total. Paying is on Stripe Checkout (cards, and Link); until Stripe is set up, on the kit’s test page, where no money moves (see Paying, below). Once paid, the seats are sold for everyone, and the guest gets a ticket page with a QR code for the door.
+- Backing out of the payment page books nothing and keeps the seats held, to try again. A hold that runs out before paying books nothing.
 - **The door** (`/staff/door`) scans a ticket once. A photo of the ticket's code (on a phone, the photo picker opens the camera) is decoded in the browser by symbology's WebAssembly decoder, or the code can be typed, with or without JavaScript. The door sees what to let in: the film, time, auditorium and seats, never who booked. A second scan says when the ticket was first used, and two doors scanning at the same moment let it in once. The guest's ticket page shows "Used at 7:41 PM" as it happens.
 - **Staff accounts** are the Potomac kit's `staff` and `staff/pages`. A new theatre prints a one-time link for its first owner when the server starts; the owner invites the rest from **People**, with a link for each that works once. Passwords are hashed with scrypt, sessions can be ended, five wrong passwords lock an email for fifteen minutes, and none of it is ever in a page's Sync scope.
 - A page reads only what it shows: every showing's seats and holds, and the guest's own tickets. Bookings, payments and other guests' tickets (with their names and emails) never leave the server.
@@ -70,6 +70,21 @@ With `DEMO=1` the server is a demo anyone can try, back office included (`src/de
 3. Give it a domain under **Settings → Networking**, and keep it at one replica.
 
 For a real business, leave out `DEMO`, set `DATA_DIR` to a mounted volume, start it with `npm start`, and claim the first owner's setup link from the deploy log.
+
+## Paying
+
+The customer pays on **Stripe**: the card is typed there, never here. The seats stay held while they're there, and become a ticket once Stripe says it's paid: when they come back, or from Stripe's webhook. Backing out keeps the seats held for another try. Stripe Checkout takes cards, and Link (Stripe’s saved details) when it’s turned on in the Dashboard (Settings → Payment methods).
+
+Until Stripe's settings are on the server, the kit's test page stands in. It is plainly a test, with no card and no money, and makes the same trip there and back. To use Stripe's test mode, set these on Railway:
+
+| Setting | What |
+| --- | --- |
+| `PAY_STRIPE_KEY` | A test secret key, `sk_test_…` (Stripe Dashboard → Developers → API keys, in test mode). A test key means test mode: no money moves |
+| `PAY_STRIPE_WEBHOOK_SECRET` | Optional: a webhook endpoint for `checkout.session.completed` and `checkout.session.async_payment_succeeded` at `https://cinestack.potomac.solutions/pay/webhook`, and its signing secret |
+
+`PAY_PROVIDER` picks another platform instead (`stripe`, `square`, `paypal`, `helcim`), with its own settings as in the kit's README. Nothing else changes. Keep the public demo on test keys: with live ones, real money moves.
+
+`SESSION_SECRET` must be at least 32 characters now (the kit refuses a shorter one).
 
 ## How it is put together
 

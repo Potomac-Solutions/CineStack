@@ -23,6 +23,7 @@ import { createAdmin } from './src/admin.js';
 import { createNotices } from '@potomac-solutions/kit/notice';
 import { lockedStaff, lockedCustomers, staffSignIn, guestSignIn, nightly } from './src/demo.js';
 import { loadQr } from '@journey-to-code/symbology';
+import { createPayments } from './src/payments.js';
 import { createBoxOffice } from './src/box-office.js';
 import { sessions } from './src/session.js';
 import { layout, escape } from './src/layout.js';
@@ -49,13 +50,15 @@ function files() {
 
 const time = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'cinestack.db'), cache = true, secret = process.env.SESSION_SECRET, holdMs, sweepMs, staffCost, now = Date.now , demo = process.env.DEMO === '1' } = {}) {
+export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'cinestack.db'), cache = true, secret = process.env.SESSION_SECRET, holdMs, sweepMs, staffCost, now = Date.now , demo = process.env.DEMO === '1', payEnv = process.env, payFetch } = {}) {
   if (!secret) {
     if (process.env.NODE_ENV === 'production') throw new Error('Set SESSION_SECRET.');
     // The kit signs nothing with a secret under 32 characters.
     secret = 'cinestack-development-only-not-a-secret';
   }
-  const boxOffice = createBoxOffice({ db, holdMs, sweepMs });
+  // Stripe is this theatre's platform (cards, and Link); until its key is on the server, the kit's test page stands in.
+  const payments = createPayments({ env: payEnv, intended: 'stripe', fetch: payFetch });
+  const boxOffice = createBoxOffice({ db, holdMs, sweepMs, provider: payments.provider });
   const session = sessions({ secret });
   // The theatre's people, in its own log; sign-in, links, people and passwords are the kit's pages.
   const production = process.env.NODE_ENV === 'production';
@@ -75,7 +78,7 @@ export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'cines
     send: mail.send,
     templates: {
       reset: ({ name, link }) => ({ subject: `Reset your ${boxOffice.theatre.name} password`, body: `Hi ${name},\n\nThis link sets a new password. It works once, for an hour:\n${link}\n\nIf it wasn’t you, ignore this email.` }),
-      tickets: ({ name, film, when, hall, seats, total, link }) => ({ subject: `Your tickets: ${film}`, body: `Hi ${name},\n\n${film}, ${when}, ${hall}. Seats ${seats}. ${total}, paid (test mode).\n\nShow the code at the door: ${link}` }),
+      tickets: ({ name, film, when, hall, seats, total, link }) => ({ subject: `Your tickets: ${film}`, body: `Hi ${name},\n\n${film}, ${when}, ${hall}. Seats ${seats}. ${total}, paid${payments.sandbox ? ' (test mode)' : ''}.\n\nShow the code at the door: ${link}` }),
     },
   });
   const origin = (req) => process.env.PUBLIC_URL || `http://${req.headers.host ?? 'localhost'}`;
@@ -118,6 +121,12 @@ export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'cines
     return new URLSearchParams(body);
   }
 
+  /** The tickets email, once, when a booking is first paid. */
+  async function tellTickets(req, key) {
+    const ticket = boxOffice.ticketByKey(key);
+    if (ticket?.email) await notify.notify({ email: ticket.email }, 'tickets', { name: ticket.name || 'there', film: ticket.film.title, when: time(ticket.showing.starts), hall: ticket.hall.name, seats: ticket.units.join(', '), total: money(ticket.cents), link: `${origin(req)}/ticket/${key}` });
+  }
+
   /** Paying for held seats: the kit's checkout-form, one line per seat. */
   function bookPage(p, showing, booking, problem, account) {
     const film = boxOffice.film(showing.film);
@@ -127,7 +136,7 @@ export async function createApp({ db = join(process.env.DATA_DIR ?? here, 'cines
   <h1>${escape(film.title)}</h1>
   <p class="lede">${time(showing.starts)} · ${escape(boxOffice.hall(showing.auditorium).name)} · held for you until ${time(booking.until)}</p>
 </section>
-${p.render('checkout-form', { cart, place: `/book/${showing.id}`, checkout: booking.key, problem, testMode: true, name: account?.name ?? '', email: account?.email ?? '' })}`;
+${p.render('checkout-form', { cart, place: `/book/${showing.id}`, checkout: booking.key, problem, ...payments.form, name: account?.name ?? '', email: account?.email ?? '' })}`;
   }
 
   /** The door: scan a ticket's code, from a photo or typed. For a door-shift device. */
@@ -149,7 +158,7 @@ ${p.render('door-scanner', { resultNow: result ?? {}, timeZone: boxOffice.theatr
   function ticketPage(p, ticket) {
     const code = qr.svg(qr.encode(ticket.key), { title: `Ticket ${ticket.key}` });
     return `<section class="ticket">
-  <p class="tag">Ticket · test mode</p>
+  <p class="tag">Ticket${payments.sandbox ? ' · test mode' : ''}</p>
   <h1>${escape(ticket.film.title)}</h1>
   <p class="lede">${time(ticket.showing.starts)} · ${escape(ticket.hall.name)}</p>
   <p class="seats">${ticket.units.length === 1 ? 'Seat' : 'Seats'} <strong>${escape(ticket.units.join(', '))}</strong> · ${money(ticket.cents)}</p>
@@ -321,15 +330,34 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
         if (req.headers['sec-fetch-site'] === 'cross-site') return send(res, 403, 'Forbidden');
         const form = await readForm(req);
         if (!form) return send(res, 413, 'Too large');
-        const done = await boxOffice.book(withAccount(session.read(req.headers.cookie ?? ''), req), booking[1], form);
-        if (done.ok) {
-          const ticket = boxOffice.ticket(withAccount(session.read(req.headers.cookie ?? ''), req), done.ticket);
-          const email = String(form.get('email') ?? '').trim();
-          if (ticket && email) await notify.notify({ email }, 'tickets', { name: String(form.get('name') ?? '').trim() || 'there', film: ticket.film.title, when: time(ticket.showing.starts), hall: ticket.hall.name, seats: ticket.units.join(', '), total: money(ticket.cents), link: `${origin(req)}/ticket/${done.ticket}` });
-        }
+        const done = await boxOffice.book(withAccount(session.read(req.headers.cookie ?? ''), req), booking[1], form, { back: `${origin(req)}/pay/back`, cancel: `${origin(req)}/pay/cancel` });
+        if (done.paying) return payments.send(res, done.pay, { cancel: `/pay/cancel?booking=${done.ticket}`, fields: { booking: done.ticket } });
+        if (done.ok) await tellTickets(req, done.ticket);
         return back(res, done.ok ? `/ticket/${done.ticket}` : `/book/${booking[1]}?problem=${encodeURIComponent(done.error)}`);
       }
 
+      // Paying on the platform's page: the test page, the way back, backing out, Helcim's frame and the webhook.
+      if (await payments.testRoute(req, res, url, readForm)) return;
+      if ((url.pathname === '/pay/back' || url.pathname === '/pay/cancel') && req.method === 'GET') {
+        const key = url.searchParams.get('booking') ?? '';
+        const done = url.pathname === '/pay/back' ? await boxOffice.finish(key) : await boxOffice.cancel(withAccount(session.read(req.headers.cookie ?? ''), req), key);
+        if (done.ok && !done.again) await tellTickets(req, done.ticket);
+        return back(res, done.ok ? `/ticket/${done.ticket}` : done.showing ? `/book/${done.showing}?problem=${encodeURIComponent(done.error)}` : `/?problem=${encodeURIComponent(done.error)}`);
+      }
+      if (url.pathname === '/pay/told' && req.method === 'POST') {
+        const form = await readForm(req);
+        if (!form) return send(res, 413, 'Too large');
+        const done = await boxOffice.finish(String(form.get('booking') ?? ''), { told: String(form.get('told') ?? '') });
+        if (done.ok && !done.again) await tellTickets(req, done.ticket);
+        return back(res, done.ok ? `/ticket/${done.ticket}` : done.showing ? `/book/${done.showing}?problem=${encodeURIComponent(done.error)}` : '/');
+      }
+      if (url.pathname === '/pay/webhook' && req.method === 'POST') {
+        const request = await payments.webhook(req, process.env.PUBLIC_URL || origin(req));
+        if (!request) return send(res, 413, 'Too large');
+        const heard = await boxOffice.heard(request);
+        if (heard.ok && !heard.again) await tellTickets(req, heard.key);
+        return send(res, heard.error === 'bad-signature' ? 401 : 200, heard.error === 'bad-signature' ? 'Bad signature' : 'ok');
+      }
       if (url.pathname === '/health') {
         res.writeHead(200, { 'content-type': 'text/plain' });
         return res.end('ok');
@@ -400,7 +428,7 @@ ${p.render('seat-chart', { showing: showing.id, me: guest.pub, rows, seatsNow: h
   });
 
   server.on('close', () => boxOffice.close());
-  return Object.assign(server, { demo, boxOffice, staff, customers, sent: mail.sent });
+  return Object.assign(server, { demo, boxOffice, payments, staff, customers, sent: mail.sent });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
